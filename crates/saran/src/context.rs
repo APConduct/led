@@ -74,3 +74,64 @@ impl<'a> DrawContext for EguiDrawContext<'a> {
     }
     // More drawing methods can be implemented as needed
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui::Context as EguiContext;
+
+    struct DummyUi {
+        pub last_label: Option<String>,
+    }
+
+    impl DummyUi {
+        fn new() -> Self {
+            Self { last_label: None }
+        }
+        fn label(&mut self, text: &str) {
+            self.last_label = Some(text.to_owned());
+        }
+    }
+
+    // Adapter to allow DummyUi to be used in EguiDrawContext for testing
+    struct TestEguiDrawContext<'a> {
+        pub ui: &'a mut DummyUi,
+    }
+
+    impl<'a> DrawContext for TestEguiDrawContext<'a> {
+        fn draw_text(&mut self, text: &str) {
+            self.ui.label(text);
+        }
+    }
+
+    #[test]
+    fn creates_context_with_provided_egui_ctx() {
+        let egui_ctx = EguiContext::default();
+        let context = Context::new(egui_ctx.clone());
+        assert_eq!(context.egui_ctx.memory(|_| ()), egui_ctx.memory(|_| ()));
+    }
+
+    #[test]
+    fn egui_draw_context_draws_text_label() {
+        let mut dummy_ui = DummyUi::new();
+        let mut draw_ctx = TestEguiDrawContext { ui: &mut dummy_ui };
+        draw_ctx.draw_text("Hello, world!");
+        assert_eq!(draw_ctx.ui.last_label.as_deref(), Some("Hello, world!"));
+    }
+
+    #[test]
+    fn egui_draw_context_draws_empty_text() {
+        let mut dummy_ui = DummyUi::new();
+        let mut draw_ctx = TestEguiDrawContext { ui: &mut dummy_ui };
+        draw_ctx.draw_text("");
+        assert_eq!(draw_ctx.ui.last_label.as_deref(), Some(""));
+    }
+
+    #[test]
+    fn egui_draw_context_draws_unicode_text() {
+        let mut dummy_ui = DummyUi::new();
+        let mut draw_ctx = TestEguiDrawContext { ui: &mut dummy_ui };
+        draw_ctx.draw_text("こんにちは世界");
+        assert_eq!(draw_ctx.ui.last_label.as_deref(), Some("こんにちは世界"));
+    }
+}
