@@ -1,24 +1,34 @@
 use super::types::*;
 use anyhow::Result as AnyResult;
 
+/// Module containing line-related structures.
 pub mod line {
+    /// Stores information about a line in the piece table.
     #[derive(Debug, Clone)]
     pub struct Info {
+        /// Index of the piece containing this line.
         pub(crate) piece_idx: usize,
+        /// Offset within the piece where the line starts.
         pub(crate) offset_in_piece: usize,
+        /// Absolute offset in the document.
         pub(crate) abs_offset: usize,
+        /// Line number in the document.
         pub(crate) line_number: usize,
     }
 }
 
-
-
+/// Module containing the piece table implementation.
 pub mod piece {
+    /// Represents a piece in the piece table.
     #[derive(Debug, Clone, Copy)]
     pub struct Piece {
+        /// Source buffer (original or add).
         pub source: ID,
+        /// Start offset in the source buffer.
         pub start: usize,
+        /// Length of the piece.
         pub length: usize,
+        /// Number of line breaks in the piece.
         pub line_breaks: u32,
     }
 
@@ -27,22 +37,33 @@ pub mod piece {
     use std::cmp::PartialEq;
     use std::collections::BTreeMap;
 
+    /// Piece table data structure for efficient text editing.
     pub struct Table {
+        /// The original buffer (read-only).
         original: String,
+        /// The add buffer (for inserted text).
         add_buffer: String,
 
+        /// List of pieces representing the current document.
         pieces: Vec<Piece>,
 
+        /// Cache for line information.
         line_cache: Vec<super::line::Info>,
+        /// Cache mapping character offsets to piece indices.
         char_to_piece_cache: BTreeMap<usize, usize>,
 
+        /// Total length of the document.
         total_length: usize,
+        /// Total number of lines in the document.
         total_lines: usize,
 
+        /// Indicates if the line cache is dirty.
         line_cache_dirty: bool,
+        /// Offset from which the char cache is dirty.
         char_cache_dirty_from: usize,
     }
 
+    /// Implements equality for the ID type.
     impl PartialEq for ID {
         fn eq(&self, other: &Self) -> bool {
             match (self, other) {
@@ -54,6 +75,11 @@ pub mod piece {
     }
 
     impl Table {
+        /// Creates a new piece table with the given initial text.
+        ///
+        /// # Arguments
+        ///
+        /// * `initial` - The initial text for the document.
         pub fn new(initial: String) -> Self {
             let line_breaks = count_line_breaks(&initial);
             let length = initial.len();
@@ -62,7 +88,7 @@ pub mod piece {
                 original: initial,
                 add_buffer: String::new(),
                 pieces: vec![Piece {
-                    source: super::source::ID::Original,
+                    source: ID::Original,
                     start: 0,
                     length,
                     line_breaks,
@@ -78,14 +104,26 @@ pub mod piece {
             table
         }
 
+        /// Returns the total length of the document.
         pub fn len(&self) -> usize {
             self.total_length
         }
 
+        /// Returns the total number of lines in the document.
         pub fn lines(&self) -> usize {
             self.total_lines
         }
 
+        /// Inserts text at the specified offset.
+        ///
+        /// # Arguments
+        ///
+        /// * `offset` - The position to insert the text.
+        /// * `text` - The text to insert.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the offset is out of bounds.
         pub fn insert(&mut self, offset: usize, text: &str) -> super::AnyResult<()> {
             if offset > self.total_length {
                 return Err(anyhow::anyhow!("Insert offset out of bounds"));
@@ -111,6 +149,16 @@ pub mod piece {
             Ok(())
         }
 
+        /// Deletes a range of text from the document.
+        ///
+        /// # Arguments
+        ///
+        /// * `start` - The start offset of the range to delete.
+        /// * `length` - The length of the range to delete.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the range is out of bounds.
         pub fn delete(&mut self, start: usize, length: usize) -> super::AnyResult<()> {
             if start + length > self.total_length {
                 return Err(anyhow::anyhow!("Delete range out of bounds"));
@@ -131,6 +179,12 @@ pub mod piece {
             Ok(())
         }
 
+        /// Returns the text in the specified range.
+        ///
+        /// # Arguments
+        ///
+        /// * `start` - The start offset.
+        /// * `length` - The length of the text to retrieve.
         pub fn get_text(&self, start: usize, length: usize) -> String {
             if start + length > self.total_length {
                 return String::new(); // or handle error
@@ -159,6 +213,15 @@ pub mod piece {
             result
         }
 
+        /// Converts an offset to a line and column position.
+        ///
+        /// # Arguments
+        ///
+        /// * `offset` - The character offset in the document.
+        ///
+        /// # Returns
+        ///
+        /// The corresponding `Position` (line and column).
         pub fn offset_to_position(&self, offset: usize) -> super::Position {
             if offset >= self.total_length {
                 return super::Position { line: 0, column: 0 }; // or handle error
@@ -198,6 +261,15 @@ pub mod piece {
             super::Position { line: 0, column: 0 } // Fallback, should not happen
         }
 
+        /// Converts a line and column position to an offset.
+        ///
+        /// # Arguments
+        ///
+        /// * `pos` - The position (line and column).
+        ///
+        /// # Returns
+        ///
+        /// The corresponding character offset.
         pub fn position_to_offset(&self, pos: super::Position) -> usize {
             let mut current_line = 0;
             let mut current_offset = 0;
@@ -234,6 +306,15 @@ pub mod piece {
             self.total_length
         }
 
+        /// Finds the index of the piece containing the given offset.
+        ///
+        /// # Arguments
+        ///
+        /// * `offset` - The character offset.
+        ///
+        /// # Returns
+        ///
+        /// The index of the piece.
         fn find_piece_containing_offset(&self, offset: usize) -> usize {
             let mut current_offset = 0;
             for (i, piece) in self.pieces.iter().enumerate() {
@@ -245,10 +326,29 @@ pub mod piece {
             self.pieces.len()
         }
 
+        /// Returns the absolute start offset of the specified piece.
+        ///
+        /// # Arguments
+        ///
+        /// * `piece_idx` - The index of the piece.
+        ///
+        /// # Returns
+        ///
+        /// The absolute offset.
         fn get_piece_start_offset(&self, piece_idx: usize) -> usize {
             self.pieces[..piece_idx].iter().map(|p| p.length).sum()
         }
 
+        /// Splits a piece at the given offset.
+        ///
+        /// # Arguments
+        ///
+        /// * `piece_idx` - The index of the piece to split.
+        /// * `offset` - The offset at which to split.
+        ///
+        /// # Returns
+        ///
+        /// An option containing the split result.
         fn split_piece_at(
             &mut self,
             piece_idx: usize,
@@ -303,6 +403,18 @@ pub mod piece {
             })
         }
 
+        //noinspection ALL
+        /// Deletes text within a single piece.
+        ///
+        /// # Arguments
+        ///
+        /// * `piece_idx` - The index of the piece.
+        /// * `start` - The start offset.
+        /// * `end` - The end offset.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the range is out of bounds.
         fn delete_within_piece(
             &mut self,
             piece_idx: usize,
@@ -372,6 +484,20 @@ pub mod piece {
 
             Ok(())
         }
+
+        //noinspection ALL
+        /// Deletes text across multiple pieces.
+        ///
+        /// # Arguments
+        ///
+        /// * `start_piece_idx` - The index of the first piece.
+        /// * `end_piece_idx` - The index of the last piece.
+        /// * `start` - The start offset.
+        /// * `end` - The end offset.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the indices are out of bounds.
         fn delete_across_pieces(
             &mut self,
             start_piece_idx: usize,
@@ -444,11 +570,27 @@ pub mod piece {
 
             Ok(())
         }
+
+        /// Counts the number of line breaks in a given range.
+        ///
+        /// # Arguments
+        ///
+        /// * `start` - The start offset.
+        /// * `end` - The end offset.
+        ///
+        /// # Returns
+        ///
+        /// The number of line breaks.
         fn count_line_breaks_in_range(&self, start: usize, end: usize) -> usize {
             let text = self.get_text(start, end - start);
             count_line_breaks(&text) as usize
         }
 
+        /// Attempts to merge adjacent pieces if possible.
+        ///
+        /// # Arguments
+        ///
+        /// * `piece_idx` - The index around which to coalesce.
         fn coalesce_pieces_around(&mut self, piece_idx: usize) {
             if piece_idx > 0 && piece_idx < self.pieces.len() {
                 // Copy fields needed for comparison
@@ -466,11 +608,18 @@ pub mod piece {
                 }
             }
         }
+
+        /// Marks caches as dirty from a given offset.
+        ///
+        /// # Arguments
+        ///
+        /// * `offset` - The offset from which caches are dirty.
         fn mark_caches_dirty_from(&mut self, offset: usize) {
             self.line_cache_dirty = true;
             self.char_cache_dirty_from = offset;
         }
 
+        /// Rebuilds the line and character caches.
         fn rebuild_caches(&mut self) {
             self.line_cache.clear();
             let mut current_offset = 0;
@@ -496,8 +645,11 @@ pub mod piece {
     }
 }
 
+/// Module for split operation results.
 mod split {
+    /// Result of splitting a piece.
     pub(crate) struct Result {
+        /// Index at which to insert the new piece.
         pub(crate) insert_idx: usize,
     }
 }
