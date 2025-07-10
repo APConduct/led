@@ -307,3 +307,192 @@ impl std::ops::Neg for Point<String> {
         format!("{}{}", self.x, self.y)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn creates_point_and_accesses_coordinates() {
+        let p = Point::new(3, 4);
+        assert_eq!(*p.x(), 3);
+        assert_eq!(*p.y(), 4);
+        assert_eq!(p.into_tuple(), (3, 4));
+    }
+
+    #[test]
+    fn creates_point_from_tuple() {
+        let p = Point::from_tuple((5, 6));
+        assert_eq!(p.x, 5);
+        assert_eq!(p.y, 6);
+    }
+
+    #[test]
+    fn maps_coordinates_with_map() {
+        let p = Point::new(2, 3);
+        let p2 = p.map(|v| v * 2);
+        assert_eq!(p2, Point::new(4, 6));
+    }
+
+    #[test]
+    fn maps_coordinates_with_map_ref() {
+        let p = Point::new(2, 3);
+        let p2 = p.map_ref(|v| v + 1);
+        assert_eq!(p2, Point::new(3, 4));
+    }
+
+    #[test]
+    fn maps_coordinates_with_map_mut() {
+        let p = Point::new(2, 3);
+        let p2 = p.map_mut(|v| v * 3);
+        assert_eq!(p2, Point::new(6, 9));
+    }
+
+    #[test]
+    fn maps_coordinates_with_map_mut_ref() {
+        let mut p = Point::new(2, 3);
+        let p2 = p.map_mut_ref(|v| {
+            *v += 1;
+            *v
+        });
+        assert_eq!(p2, Point::new(3, 4));
+    }
+
+    #[test]
+    fn zips_two_points_with_zip() {
+        let p1 = Point::new(1, 2);
+        let p2 = Point::new(3, 4);
+        let p3 = p1.zip(p2, |a, b| a + b);
+        assert_eq!(p3, Point::new(4, 6));
+    }
+
+    #[test]
+    fn zips_two_points_with_zip_ref() {
+        let p1 = Point::new(1, 2);
+        let p2 = Point::new(3, 4);
+        let p3 = p1.zip_ref(&p2, |a, b| a * b);
+        assert_eq!(p3, Point::new(3, 8));
+    }
+
+    #[test]
+    fn zips_two_points_with_zip_mut() {
+        let p1 = Point::new(1, 2);
+        let p2 = Point::new(3, 4);
+        let p3 = p1.zip_mut(p2, |a, b| a - b);
+        assert_eq!(p3, Point::new(-2, -2));
+    }
+
+    #[test]
+    fn zips_two_points_with_zip_mut_ref() {
+        let mut p1 = Point::new(1, 2);
+        let p2 = Point::new(3, 4);
+        let p3 = p1.zip_mut_ref(&p2, |a, b| {
+            *a += *b;
+            *a
+        });
+        assert_eq!(p3, Point::new(4, 6));
+    }
+
+    #[test]
+    fn map_x_and_map_y_apply_function_to_single_coordinate() {
+        let p = Point::new(2, 3);
+        let px = p.clone().map_x(|v| v * 10);
+        let py = p.clone().map_y(|v| v * 100);
+        assert_eq!(px, Point::new(20, 30)); // Both x and y multiplied by 10
+        assert_eq!(py, Point::new(200, 300)); // Both x and y multiplied by 100
+    }
+
+    #[test]
+    fn map_x_ref_and_map_y_ref_apply_function_to_single_coordinate() {
+        let p = Point::new(2, 3);
+        let px = p.map_x_ref(|v| v + 1);
+        let py = p.map_y_ref(|v| v + 2);
+        assert_eq!(px, Point::new(3, 4)); // Both x and y incremented by 1
+        assert_eq!(py, Point::new(4, 5)); // Both x and y incremented by 2
+    }
+
+    #[test]
+    fn map_x_mut_and_map_y_mut_apply_mutable_function() {
+        let p = Point::new(2, 3);
+        let px = p.clone().map_x_mut(|v| v * 2);
+        let py = p.map_y_mut(|v| v * 3);
+        assert_eq!(px, Point::new(4, 6)); // Both x and y multiplied by 2
+        assert_eq!(py, Point::new(6, 9)); // Both x and y multiplied by 3
+    }
+
+    #[test]
+    fn map_x_mut_ref_and_map_y_mut_ref_apply_mutable_function() {
+        let mut p = Point::new(2, 3);
+        let px = p.clone().map_x_mut_ref(|v| {
+            *v += 1;
+            *v
+        });
+        let mut p2 = Point::new(2, 3);
+        let py = p2.map_y_mut_ref(|v| {
+            *v *= 2;
+            *v
+        });
+        assert_eq!(px, Point::new(3, 4));
+        assert_eq!(py, Point::new(4, 6));
+    }
+
+    #[test]
+    fn display_formats_point_correctly() {
+        let p = Point::new(7, 8);
+        assert_eq!(format!("{}", p), "(7, 8)");
+    }
+
+    #[test]
+    fn add_points_of_string_concatenates_coordinates() {
+        let p1 = Point::new("a".to_string(), "b".to_string());
+        let p2 = Point::new("c".to_string(), "d".to_string());
+        let p3 = p1 + p2;
+        assert_eq!(p3, Point::new("ac".to_string(), "bd".to_string()));
+    }
+
+    #[test]
+    fn add_assign_points_of_string_concatenates_and_assigns() {
+        let mut p1 = Point::new("x".to_string(), "y".to_string());
+        let p2 = Point::new("z".to_string(), "w".to_string());
+        p1 += p2;
+        assert_eq!(p1, Point::new("xz".to_string(), "yw".to_string()));
+    }
+
+    #[test]
+    fn mul_point_string_repeats_coordinates() {
+        let p = Point::new("hi".to_string(), "ok".to_string());
+        let p2 = p * 3;
+        assert_eq!(p2, Point::new("hihihi".to_string(), "okokok".to_string()));
+    }
+
+    #[test]
+    fn mul_assign_point_string_repeats_and_assigns() {
+        let mut p = Point::new("a".to_string(), "b".to_string());
+        p *= 2;
+        assert_eq!(p, Point::new("aa".to_string(), "bb".to_string()));
+    }
+
+    #[test]
+    fn neg_point_string_concatenates_coordinates() {
+        let p = Point::new("foo".to_string(), "bar".to_string());
+        let s = -p;
+        assert_eq!(s, "foobar".to_string());
+    }
+
+    #[test]
+    fn edge_case_empty_strings_in_point_string_operations() {
+        let p1 = Point::new("".to_string(), "".to_string());
+        let p2 = Point::new("x".to_string(), "y".to_string());
+        assert_eq!(p1.clone() + p2.clone(), Point::new("x".to_string(), "y".to_string()));
+        assert_eq!(p2.clone() + p1.clone(), Point::new("x".to_string(), "y".to_string()));
+        assert_eq!(p1.clone() * 0, Point::new("".to_string(), "".to_string()));
+        assert_eq!(-p1, "".to_string());
+    }
+
+    #[test]
+    fn edge_case_zero_and_negative_numbers() {
+        let p = Point::new(0i32, -1i32);
+        let p2 = p.map(|v| v.abs());
+        assert_eq!(p2, Point::new(0, 1));
+    }
+}
