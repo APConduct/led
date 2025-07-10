@@ -4,6 +4,7 @@ use anyhow::Result as AnyResult;
 /// Module containing line-related structures.
 pub mod line {
     /// Stores information about a line in the piece table.
+    #[allow(unused)]
     #[derive(Debug, Clone)]
     pub struct Info {
         /// Index of the piece containing this line.
@@ -18,6 +19,7 @@ pub mod line {
 }
 
 /// Module containing the piece table implementation.
+#[allow(unused)]
 pub mod piece {
     /// Represents a piece in the piece table.
     #[derive(Debug, Clone, Copy)]
