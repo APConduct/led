@@ -1,30 +1,48 @@
+//noinspection ALL
+/// Re-exports the buffer ID type from the types' module.
 pub use super::types::buffer::ID;
 use super::commands::editor::Command;
+
+/// Module containing metadata related to buffers, such as file path, language, and timestamps.
 pub mod meta {
+    /// Metadata associated with a buffer, including file path, language, modification status, and creation time.
     #[derive(Debug, Clone)]
     pub struct Data {
+        /// Optional file path associated with the buffer.
         pub file_path: Option<String>,
+        /// Optional programming language of the buffer.
         pub language: Option<String>,
+        /// Indicates whether the buffer has been modified.
         pub modified: bool,
+        /// Timestamp of when the buffer was created.
         pub created_at: std::time::SystemTime,
     }
 }
 
+/// Module containing the editor state and buffer management logic.
 pub mod editor {
     use std::collections::HashMap;
     use crate::led::buffer::meta;
 
+    /// Represents the state of the editor, including buffers, metadata, cursors, and undo/redo stacks.
     pub struct State {
+        /// Maps buffer IDs to their corresponding piece tables.
         buffers: HashMap<super::ID, super::super::piece::Table>,
-        buffer_metadata: HashMap<super::ID, super::meta::Data>,
+        /// Maps buffer IDs to their metadata.
+        buffer_metadata: HashMap<super::ID, meta::Data>,
+        /// Maps buffer IDs to their cursor states.
         cursors: HashMap<super::ID, super::super::cursor::State>,
+        /// The currently active buffer, if any.
         active_buffer: Option<super::ID>,
 
+        /// Undo stack for each buffer.
         undo_stack: HashMap<super::ID, Vec<super::Command>>,
+        /// Redo stack for each buffer.
         redo_stack: HashMap<super::ID, Vec<super::Command>>,
     }
 
     impl State {
+        /// Creates a new editor state with no buffers.
         pub fn new() -> Self {
             Self {
                 buffers: HashMap::new(),
@@ -36,6 +54,15 @@ pub mod editor {
             }
         }
 
+        /// Creates a new buffer with the given content and initializes its metadata, cursor, and undo/redo stacks.
+        ///
+        /// # Arguments
+        ///
+        /// * `content` - The initial content of the buffer.
+        ///
+        /// # Returns
+        ///
+        /// The unique ID of the newly created buffer.
         pub fn create_buffer(&mut self, content: String) -> super::ID {
             let buffer_id = super::ID::new();
             let piece_table = super::super::piece::Table::new(content);
@@ -58,6 +85,15 @@ pub mod editor {
             buffer_id
         }
 
+        /// Executes an editor command, such as inserting or deleting text, moving the cursor, or saving a buffer.
+        ///
+        /// # Arguments
+        ///
+        /// * `command` - The command to execute.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the command cannot be executed.
         pub fn execute_command(&mut self, command: super::Command) -> anyhow::Result<()> {
             match command {
                 super::Command::InsertText {buffer_id, offset, text} => {
@@ -73,21 +109,21 @@ pub mod editor {
                     }
                 }
                 super::Command::MoveCursor {buffer_id, position} => {
-                    if let Some(cursor) = self.cursors.get_mut(&buffer_id) { 
+                    if let Some(cursor) = self.cursors.get_mut(&buffer_id) {
                         cursor.position = position;
                         cursor.selection = None;
                     }
                 }
                 super::Command::SetSelection {buffer_id, range} => {
-                    if let Some(cursor) = self.cursors.get_mut(&buffer_id) { 
+                    if let Some(cursor) = self.cursors.get_mut(&buffer_id) {
                         cursor.selection = Some(range);
                     }
                 }
-                
+
                 super::Command::NewBuffer {content} => {
                     self.create_buffer(content);
                 }
-                
+
                 super::Command::SaveBuffer {buffer_id, file_path} => {
                     if let Some(meta) = self.buffer_metadata.get_mut(&buffer_id) {
                         meta.file_path = Some(file_path);
@@ -97,24 +133,47 @@ pub mod editor {
             }
             Ok(())
         }
-        
+
+        /// Marks the specified buffer as modified in its metadata.
+        ///
+        /// # Arguments
+        ///
+        /// * `buffer_id` - The ID of the buffer to mark as modified.
         fn mark_buffer_modified(&mut self, buffer_id: super::ID) {
-            if let Some(meta) = self.buffer_metadata.get_mut(&buffer_id) { 
+            if let Some(meta) = self.buffer_metadata.get_mut(&buffer_id) {
                 meta.modified = true;
             }
         }
-        
-        fn get_buffer_text(&self, buffer_id: super::ID) -> Option<String> {
+
+        /// Retrieves the full text of the specified buffer, if it exists.
+        ///
+        /// # Arguments
+        ///
+        /// * `buffer_id` - The ID of the buffer.
+        ///
+        /// # Returns
+        ///
+        /// An `Option` containing the buffer's text, or `None` if the buffer does not exist.
+        pub fn get_buffer_text(&self, buffer_id: super::ID) -> Option<String> {
             self.buffers.get(&buffer_id).map(|buffer| buffer.get_text(0, buffer.len()))
         }
-        
+
+        /// Returns the ID of the currently active buffer, if any.
         pub fn get_active_biffer(&self) -> Option<super::ID> {
             self.active_buffer
         }
-        
+
+        /// Retrieves the cursor state for the specified buffer, if it exists.
+        ///
+        /// # Arguments
+        ///
+        /// * `buffer_id` - The ID of the buffer.
+        ///
+        /// # Returns
+        ///
+        /// An `Option` containing a reference to the cursor state, or `None` if not found.
         pub fn get_cursor_state(&self, buffer_id: super::ID) -> Option<&super::super::cursor::State> {
             self.cursors.get(&buffer_id)
         }
     }
 }
-
