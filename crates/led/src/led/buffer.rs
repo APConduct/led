@@ -181,9 +181,7 @@ pub mod editor {
 #[cfg(test)]
 mod tests {
     use super::editor::State;
-    use super::meta::Data;
     use super::ID;
-    use std::time::SystemTime;
 
     struct DummyPieceTable;
     impl DummyPieceTable {
