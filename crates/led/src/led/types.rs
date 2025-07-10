@@ -28,6 +28,7 @@ pub mod source {
 
 /// Represents a position in the document (line and column).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq)]
 pub struct Position {
     /// Line number (zero-based).
     pub line: usize,
@@ -37,6 +38,7 @@ pub struct Position {
 
 /// Represents a range in the document, defined by start and end positions.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq)]
 pub struct Range {
     /// Start position of the range.
     pub start: Position,

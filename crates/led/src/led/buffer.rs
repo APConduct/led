@@ -27,18 +27,18 @@ pub mod editor {
     /// Represents the state of the editor, including buffers, metadata, cursors, and undo/redo stacks.
     pub struct State {
         /// Maps buffer IDs to their corresponding piece tables.
-        buffers: HashMap<super::ID, super::super::piece::Table>,
+        pub(crate) buffers: HashMap<super::ID, super::super::piece::Table>,
         /// Maps buffer IDs to their metadata.
-        buffer_metadata: HashMap<super::ID, meta::Data>,
+        pub(crate) buffer_metadata: HashMap<super::ID, meta::Data>,
         /// Maps buffer IDs to their cursor states.
-        cursors: HashMap<super::ID, super::super::cursor::State>,
+        pub(crate) cursors: HashMap<super::ID, super::super::cursor::State>,
         /// The currently active buffer, if any.
-        active_buffer: Option<super::ID>,
+        pub(crate) active_buffer: Option<super::ID>,
 
         /// Undo stack for each buffer.
-        undo_stack: HashMap<super::ID, Vec<super::Command>>,
+        pub(crate) undo_stack: HashMap<super::ID, Vec<super::Command>>,
         /// Redo stack for each buffer.
-        redo_stack: HashMap<super::ID, Vec<super::Command>>,
+        pub(crate) redo_stack: HashMap<super::ID, Vec<super::Command>>,
     }
 
     impl State {
@@ -175,5 +175,135 @@ pub mod editor {
         pub fn get_cursor_state(&self, buffer_id: super::ID) -> Option<&super::super::cursor::State> {
             self.cursors.get(&buffer_id)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::editor::State;
+    use super::meta::Data;
+    use super::ID;
+    use std::time::SystemTime;
+
+    struct DummyPieceTable;
+    impl DummyPieceTable {
+        fn new(_content: String) -> Self { DummyPieceTable }
+        fn insert(&mut self, _offset: usize, _text: &str) -> anyhow::Result<()> { Ok(()) }
+        fn delete(&mut self, _start: usize, _length: usize) -> anyhow::Result<()> { Ok(()) }
+        fn get_text(&self, _start: usize, _end: usize) -> String { "dummy".to_string() }
+        fn len(&self) -> usize { 5 }
+    }
+
+    #[test]
+    fn create_buffer_initializes_all_fields() {
+        let mut state = State::new();
+        let buffer_id = state.create_buffer("hello".to_string());
+        assert!(state.buffers.contains_key(&buffer_id));
+        assert!(state.buffer_metadata.contains_key(&buffer_id));
+        assert!(state.cursors.contains_key(&buffer_id));
+        assert!(state.undo_stack.contains_key(&buffer_id));
+        assert!(state.redo_stack.contains_key(&buffer_id));
+        assert_eq!(state.active_buffer, Some(buffer_id));
+    }
+
+    #[test]
+    fn execute_command_insert_text_marks_buffer_modified() {
+        let mut state = State::new();
+        let buffer_id = state.create_buffer("abc".to_string());
+        let _ = state.execute_command(super::Command::InsertText {
+            buffer_id,
+            offset: 1,
+            text: "x".to_string(),
+        });
+        let meta = state.buffer_metadata.get(&buffer_id).unwrap();
+        assert!(meta.modified);
+    }
+
+    #[test]
+    fn execute_command_delete_text_marks_buffer_modified() {
+        let mut state = State::new();
+        let buffer_id = state.create_buffer("abc".to_string());
+        let _ = state.execute_command(super::Command::DeleteText {
+            buffer_id,
+            start: 0,
+            length: 1,
+        });
+        let meta = state.buffer_metadata.get(&buffer_id).unwrap();
+        assert!(meta.modified);
+    }
+
+    #[test]
+    fn execute_command_move_cursor_updates_position_and_clears_selection() {
+        let mut state = State::new();
+        let buffer_id = state.create_buffer("abc".to_string());
+        let pos = super::super::types::Position { line: 1, column: 2 };
+        let _ = state.execute_command(super::Command::MoveCursor {
+            buffer_id,
+            position: pos,
+        });
+        let cursor = state.cursors.get(&buffer_id).unwrap();
+        assert_eq!(cursor.position, pos);
+        assert!(cursor.selection.is_none());
+    }
+
+    #[test]
+    fn execute_command_set_selection_sets_selection() {
+        let mut state = State::new();
+        let buffer_id = state.create_buffer("abc".to_string());
+        let range = super::super::types::Range {
+            start: super::super::types::Position { line: 0, column: 0 },
+            end: super::super::types::Position { line: 0, column: 2 },
+        };
+        let _ = state.execute_command(super::Command::SetSelection {
+            buffer_id,
+            range: range.clone(),
+        });
+        let cursor = state.cursors.get(&buffer_id).unwrap();
+        assert_eq!(cursor.selection, Some(range));
+    }
+
+    #[test]
+    fn execute_command_new_buffer_creates_new_buffer() {
+        let mut state = State::new();
+        let before = state.buffers.len();
+        let _ = state.execute_command(super::Command::NewBuffer {
+            content: "new".to_string(),
+        });
+        assert_eq!(state.buffers.len(), before + 1);
+    }
+
+    #[test]
+    fn execute_command_save_buffer_updates_file_path_and_clears_modified() {
+        let mut state = State::new();
+        let buffer_id = state.create_buffer("abc".to_string());
+        state.buffer_metadata.get_mut(&buffer_id).unwrap().modified = true;
+        let _ = state.execute_command(super::Command::SaveBuffer {
+            buffer_id,
+            file_path: "foo.txt".to_string(),
+        });
+        let meta = state.buffer_metadata.get(&buffer_id).unwrap();
+        assert_eq!(meta.file_path, Some("foo.txt".to_string()));
+        assert!(!meta.modified);
+    }
+
+    #[test]
+    fn get_buffer_text_returns_none_for_nonexistent_buffer() {
+        let state = State::new();
+        let fake_id = ID::new();
+        assert!(state.get_buffer_text(fake_id).is_none());
+    }
+
+    #[test]
+    fn get_cursor_state_returns_none_for_nonexistent_buffer() {
+        let state = State::new();
+        let fake_id = ID::new();
+        assert!(state.get_cursor_state(fake_id).is_none());
+    }
+
+    #[test]
+    fn get_active_biffer_returns_active_buffer() {
+        let mut state = State::new();
+        let buffer_id = state.create_buffer("abc".to_string());
+        assert_eq!(state.get_active_biffer(), Some(buffer_id));
     }
 }
