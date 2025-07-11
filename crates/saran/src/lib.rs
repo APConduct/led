@@ -5,6 +5,9 @@ pub mod layout;
 pub mod widget;
 pub mod event;
 pub mod point;
+pub mod key;
+pub mod window;
+mod size;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

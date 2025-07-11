@@ -37,6 +37,9 @@ impl Label {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ID(pub u64);
+
 pub trait Widget: Draw {
     fn layout(&mut self, /* layout params */);
     fn handle_event(&mut self, /* event params */);
@@ -57,3 +60,49 @@ impl Button {
         self
     }
 }
+
+pub struct Column {
+    children: Vec<Box<dyn Widget>>,
+}
+
+impl Column {
+    /// Creates a new empty Column.
+    pub fn new() -> Self {
+        Self { children: Vec::new() }
+    }
+
+    /// Adds a child widget to the column.
+    pub fn add_child(&mut self, child: Box<dyn Widget>) {
+        self.children.push(child);
+    }
+}
+
+impl Widget for Column {
+    fn layout(&mut self /*, layout params */) {
+        // Simple vertical stacking: each child is laid out below the previous one.
+        for child in &mut self.children {
+            child.layout(/* layout params */);
+            // You would update the child's position here based on your layout system.
+        }
+    }
+
+    fn handle_event(&mut self /*, event params */) {
+        for child in &mut self.children {
+            child.handle_event(/* event params */);
+        }
+    }
+}
+
+impl Draw for Column {
+    fn draw(&mut self, ctx: &mut crate::context::Context) {
+        for child in &mut self.children {
+            child.draw(ctx);
+        }
+    }
+}
+
+// Example usage (in your UI code):
+// let mut col = Column::new();
+// col.add_child(Box::new(Label::new("First label")));
+// col.add_child(Box::new(Button::new("Click me!")));
+// ...

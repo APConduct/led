@@ -1,4 +1,8 @@
 use std::collections::HashMap;
+use crate::theme::Theme;
+use crate::size::Size;
+
+pub type ScreenSize = Size<f32>;
 
 /// The `Cache` struct provides caching for text layouts and glyph font IDs,
 /// optimizing repeated layout and font lookups in the UI rendering process.
@@ -26,4 +30,16 @@ impl Cache {
             glyph_cache: HashMap::new(),
         }
     }
+}
+
+pub enum Direction {
+    Horizontal,
+    Vertical,
+}
+
+pub struct Context<'a> {
+    pub available_space: ScreenSize,
+    pub direction: Direction,
+    pub theme: Option<&'a Theme>,
+    pub relayout_requested: bool,
 }

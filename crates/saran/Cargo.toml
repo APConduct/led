@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 egui = "0.31.1"
-fltk = "1.5.9"
+bitflags = "2.9.1"
