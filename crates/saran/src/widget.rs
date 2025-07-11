@@ -1,3 +1,7 @@
+use crate::layout::Context as LayoutContext;
+use crate::event::Event;
+
+
 /// The `Draw` trait defines a common interface for drawable UI widgets.
 ///
 /// Types implementing this trait must provide a `draw` method, which
@@ -41,9 +45,9 @@ impl Label {
 pub struct ID(pub u64);
 
 pub trait Widget: Draw {
-    fn layout(&mut self, /* layout params */);
-    fn handle_event(&mut self, /* event params */);
-    // Add more widget-specific methods as needed
+    fn layout(&mut self, ctx: &LayoutContext);
+    fn handle_event(&mut self, event: &Event);
+    // More widget-specific methods can be added here
 }
 
 pub struct Button {
@@ -78,17 +82,17 @@ impl Column {
 }
 
 impl Widget for Column {
-    fn layout(&mut self /*, layout params */) {
+    fn layout(&mut self, ctx: &LayoutContext) {
         // Simple vertical stacking: each child is laid out below the previous one.
         for child in &mut self.children {
-            child.layout(/* layout params */);
-            // You would update the child's position here based on your layout system.
+            child.layout(ctx);
+            // TODO: update the child's position here based on the layout system.
         }
     }
 
-    fn handle_event(&mut self /*, event params */) {
+    fn handle_event(&mut self, event: &Event) {
         for child in &mut self.children {
-            child.handle_event(/* event params */);
+            child.handle_event(event);
         }
     }
 }
