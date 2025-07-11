@@ -32,11 +32,22 @@ impl Cache {
     }
 }
 
+/// Represents the layout direction for UI elements.
+///
+/// - `Horizontal`: Layout elements from left to right.
+/// - `Vertical`: Layout elements from top to bottom.
 pub enum Direction {
     Horizontal,
     Vertical,
 }
 
+/// Provides contextual information for layout calculations.
+///
+/// # Fields
+/// - `available_space`: The space available for layout, typically the size of the parent container.
+/// - `direction`: The primary direction in which to lay out child elements.
+/// - `theme`: An optional reference to the current UI theme, used for styling.
+/// - `relayout_requested`: Indicates whether a relayout should be triggered (e.g., due to content or size changes).
 pub struct Context<'a> {
     pub available_space: ScreenSize,
     pub direction: Direction,
