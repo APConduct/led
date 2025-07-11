@@ -176,7 +176,16 @@ pub mod piece {
             }
             self.total_length -= length;
             self.total_lines -= deleted_lines;
+            if self.pieces.is_empty() {
+                self.total_lines = 1;
+            }
             self.mark_caches_dirty_from(start);
+
+            // Early return if table is now empty
+            if self.pieces.is_empty() {
+                return Ok(());
+            }
+
             self.coalesce_pieces_around(start_piece_idx);
             Ok(())
         }
@@ -225,42 +234,40 @@ pub mod piece {
         ///
         /// The corresponding `Position` (line and column).
         pub fn offset_to_position(&self, offset: usize) -> super::Position {
-            if offset >= self.total_length {
-                return super::Position { line: 0, column: 0 }; // or handle error
+            if offset > self.total_length {
+                return super::Position { line: 0, column: 0 };
             }
             let mut current_line = 0;
             let mut current_offset = 0;
+            let mut last_line_start = 0;
 
             for piece in &self.pieces {
-                if current_offset + piece.length > offset {
-                    let src_txt = match piece.source {
-                        ID::Original => &self.original,
-                        ID::Add => &self.add_buffer,
-                    };
-
-                    let piece_txt = &src_txt[piece.start..piece.start + piece.length];
-                    let mut line_in_piece = current_line;
-
-                    for (i, ch) in piece_txt.char_indices() {
-                        if current_offset + i >= offset {
-                            return super::Position {
-                                line: line_in_piece,
-                                column: offset - current_offset - i,
-                            };
-                        }
-                        if ch == '\n' {
-                            line_in_piece += 1;
-                        }
+                let src_txt = match piece.source {
+                    ID::Original => &self.original,
+                    ID::Add => &self.add_buffer,
+                };
+                let piece_txt = &src_txt[piece.start..piece.start + piece.length];
+                let mut line_start = current_offset;
+                for (i, ch) in piece_txt.char_indices() {
+                    if current_offset + i == offset {
+                        return super::Position {
+                            line: current_line,
+                            column: offset - line_start,
+                        };
                     }
-                    return super::Position {
-                        line: line_in_piece,
-                        column: piece.length - (offset - current_offset),
-                    };
+                    if ch == '\n' {
+                        current_line += 1;
+                        line_start = current_offset + i + 1;
+                        last_line_start = line_start;
+                    }
                 }
                 current_offset += piece.length;
-                current_line += piece.line_breaks as usize;
             }
-            super::Position { line: 0, column: 0 } // Fallback, should not happen
+            // If offset is at the end of the document, return last line and column
+            super::Position {
+                line: current_line,
+                column: offset - last_line_start,
+            }
         }
 
         /// Converts a line and column position to an offset.
@@ -318,6 +325,9 @@ pub mod piece {
         ///
         /// The index of the piece.
         fn find_piece_containing_offset(&self, offset: usize) -> usize {
+            if offset > 0 && offset == self.total_length {
+                return self.pieces.len() - 1;
+            }
             let mut current_offset = 0;
             for (i, piece) in self.pieces.iter().enumerate() {
                 if current_offset + piece.length > offset {
@@ -417,6 +427,7 @@ pub mod piece {
         /// # Errors
         ///
         /// Returns an error if the range is out of bounds.
+        // In `delete_within_piece`
         fn delete_within_piece(
             &mut self,
             piece_idx: usize,
@@ -431,13 +442,12 @@ pub mod piece {
             let offset_in_piece_start = start - piece_start_offset;
             let offset_in_piece_end = end - piece_start_offset;
 
-            let piece = &mut self.pieces[piece_idx];
-
-            if offset_in_piece_start >= piece.length || offset_in_piece_end > piece.length {
+            if offset_in_piece_start >= self.pieces[piece_idx].length || offset_in_piece_end > self.pieces[piece_idx].length {
                 return Err(anyhow::anyhow!("Delete range out of bounds for the piece"));
             }
 
             let deleted_length = offset_in_piece_end - offset_in_piece_start;
+            let piece = &mut self.pieces[piece_idx];
             let deleted_text = {
                 let source_text = match piece.source {
                     ID::Original => &self.original,
@@ -448,19 +458,20 @@ pub mod piece {
             let deleted_line_breaks = count_line_breaks(&deleted_text.to_string());
 
             if deleted_length == piece.length {
-                // Remove the whole piece
                 self.pieces.remove(piece_idx);
-            } else if offset_in_piece_start == 0 {
-                // Delete from the start
+                return Ok(());
+            }
+
+            // Only mutate if not removing the whole piece
+            let piece = &mut self.pieces[piece_idx];
+            if offset_in_piece_start == 0 {
                 piece.start += deleted_length;
                 piece.length -= deleted_length;
                 piece.line_breaks -= deleted_line_breaks;
             } else if offset_in_piece_end == piece.length {
-                // Delete from the end
                 piece.length -= deleted_length;
                 piece.line_breaks -= deleted_line_breaks;
             } else {
-                // Delete in the middle: split into two pieces
                 let right_piece = Piece {
                     source: piece.source,
                     start: piece.start + offset_in_piece_end,
@@ -469,8 +480,7 @@ pub mod piece {
                         &match piece.source {
                             ID::Original => &self.original,
                             ID::Add => &self.add_buffer,
-                        }[piece.start + offset_in_piece_end..piece.start + piece.length]
-                            .to_string(),
+                        }[piece.start + offset_in_piece_end..piece.start + piece.length].to_string(),
                     ),
                 };
                 piece.length = offset_in_piece_start;
@@ -478,8 +488,7 @@ pub mod piece {
                     &match piece.source {
                         ID::Original => &self.original,
                         ID::Add => &self.add_buffer,
-                    }[piece.start..piece.start + offset_in_piece_start]
-                        .to_string(),
+                    }[piece.start..piece.start + offset_in_piece_start].to_string(),
                 );
                 self.pieces.insert(piece_idx + 1, right_piece);
             }
@@ -503,7 +512,7 @@ pub mod piece {
         fn delete_across_pieces(
             &mut self,
             start_piece_idx: usize,
-            end_piece_idx: usize,
+            mut end_piece_idx: usize,
             start: usize,
             end: usize,
         ) -> super::AnyResult<()> {
@@ -511,63 +520,68 @@ pub mod piece {
                 return Err(anyhow::anyhow!("Piece index out of bounds"));
             }
 
-            // Gather info for first piece
             let first_piece_start_offset = self.get_piece_start_offset(start_piece_idx);
             let offset_in_first_piece = start - first_piece_start_offset;
-            let first_piece = &self.pieces[start_piece_idx];
-            let _first_piece_delete_len = first_piece.length - offset_in_first_piece;
-            let first_piece_source_text = match first_piece.source {
-                ID::Original => &self.original,
-                ID::Add => &self.add_buffer,
-            };
-            let first_piece_deleted_text = &first_piece_source_text
-                [first_piece.start + offset_in_first_piece..first_piece.start + first_piece.length];
-            let _first_piece_deleted_line_breaks =
-                count_line_breaks(&first_piece_deleted_text.to_string());
-
-            // Gather info for last piece
             let last_piece_start_offset = self.get_piece_start_offset(end_piece_idx);
             let offset_in_last_piece = end - last_piece_start_offset;
-            let last_piece = &self.pieces[end_piece_idx];
-            let last_piece_source_text = match last_piece.source {
-                ID::Original => &self.original,
-                ID::Add => &self.add_buffer,
-            };
-            let last_piece_deleted_text =
-                &last_piece_source_text[last_piece.start..last_piece.start + offset_in_last_piece];
-            let _last_piece_deleted_line_breaks =
-                count_line_breaks(&last_piece_deleted_text.to_string());
 
             // Mutate first piece: keep only the left part
-            {
-                let piece = &mut self.pieces[start_piece_idx];
-                piece.length = offset_in_first_piece;
-                piece.line_breaks = count_line_breaks(
-                    &match piece.source {
-                        ID::Original => &self.original,
-                        ID::Add => &self.add_buffer,
-                    }[piece.start..piece.start + offset_in_first_piece]
-                        .to_string(),
-                );
-            }
+            self.pieces[start_piece_idx].length = offset_in_first_piece;
+            self.pieces[start_piece_idx].line_breaks = count_line_breaks(
+                &match self.pieces[start_piece_idx].source {
+                    ID::Original => &self.original,
+                    ID::Add => &self.add_buffer,
+                }[self.pieces[start_piece_idx].start
+                    ..self.pieces[start_piece_idx].start + offset_in_first_piece]
+                    .to_string(),
+            );
 
             // Mutate last piece: keep only the right part
-            {
-                let piece = &mut self.pieces[end_piece_idx];
-                piece.start += offset_in_last_piece;
-                piece.length -= offset_in_last_piece;
-                piece.line_breaks = count_line_breaks(
-                    &match piece.source {
-                        ID::Original => &self.original,
-                        ID::Add => &self.add_buffer,
-                    }[piece.start..piece.start + piece.length]
-                        .to_string(),
-                );
-            }
+            self.pieces[end_piece_idx].start += offset_in_last_piece;
+            self.pieces[end_piece_idx].length -= offset_in_last_piece;
+            self.pieces[end_piece_idx].line_breaks = count_line_breaks(
+                &match self.pieces[end_piece_idx].source {
+                    ID::Original => &self.original,
+                    ID::Add => &self.add_buffer,
+                }[self.pieces[end_piece_idx].start
+                    ..self.pieces[end_piece_idx].start + self.pieces[end_piece_idx].length]
+                    .to_string(),
+            );
 
             // Remove all pieces between first and last (exclusive)
             if end_piece_idx > start_piece_idx + 1 {
-                self.pieces.drain(start_piece_idx + 1..end_piece_idx);
+                let drain_start = start_piece_idx + 1;
+                let drain_end = end_piece_idx;
+                self.pieces.drain(drain_start..drain_end);
+                end_piece_idx = drain_start;
+            }
+
+            // Remove empty pieces, highest index first
+            let mut to_remove = Vec::new();
+            if self
+                .pieces
+                .get(end_piece_idx)
+                .map_or(false, |p| p.length == 0)
+            {
+                to_remove.push(end_piece_idx);
+            }
+            if self
+                .pieces
+                .get(start_piece_idx)
+                .map_or(false, |p| p.length == 0)
+                && start_piece_idx != end_piece_idx
+            {
+                to_remove.push(start_piece_idx);
+            }
+            to_remove.sort_unstable_by(|a, b| b.cmp(a));
+            for idx in to_remove {
+                if idx < self.pieces.len() {
+                    self.pieces.remove(idx);
+                }
+            }
+
+            if self.pieces.is_empty() {
+                return Ok(());
             }
 
             Ok(())
@@ -594,20 +608,19 @@ pub mod piece {
         ///
         /// * `piece_idx` - The index around which to coalesce.
         fn coalesce_pieces_around(&mut self, piece_idx: usize) {
-            if piece_idx > 0 && piece_idx < self.pieces.len() {
-                // Copy fields needed for comparison
-                let can_merge = {
-                    let prev = &self.pieces[piece_idx - 1];
-                    let curr = &self.pieces[piece_idx];
-                    prev.source == curr.source && prev.start + prev.length == curr.start
-                };
-                if can_merge {
-                    // Mutate after checks
-                    let (prev, curr) = self.pieces.split_at_mut(piece_idx);
-                    prev[piece_idx - 1].length += curr[0].length;
-                    prev[piece_idx - 1].line_breaks += curr[0].line_breaks;
-                    self.pieces.remove(piece_idx);
-                }
+            if self.pieces.len() < 2 || piece_idx == 0 || piece_idx >= self.pieces.len() {
+                return;
+            }
+            let can_merge = {
+                let prev = &self.pieces[piece_idx - 1];
+                let curr = &self.pieces[piece_idx];
+                prev.source == curr.source && prev.start + prev.length == curr.start
+            };
+            if can_merge {
+                let (prev, curr) = self.pieces.split_at_mut(piece_idx);
+                prev[piece_idx - 1].length += curr[0].length;
+                prev[piece_idx - 1].line_breaks += curr[0].line_breaks;
+                self.pieces.remove(piece_idx);
             }
         }
 
@@ -653,5 +666,120 @@ mod split {
     pub(crate) struct Result {
         /// Index at which to insert the new piece.
         pub(crate) insert_idx: usize,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::piece::Table;
+
+    #[test]
+    fn new_table_has_correct_length_and_lines() {
+        let text = String::from("Hello\nWorld\n");
+        let table = Table::new(text.clone());
+        assert_eq!(table.len(), text.len());
+        assert_eq!(table.lines(), 3);
+    }
+
+    #[test]
+    fn insert_text_at_start() {
+        let mut table = Table::new("World".to_string());
+        table.insert(0, "Hello ").unwrap();
+        assert_eq!(table.get_text(0, table.len()), "Hello World");
+    }
+
+    #[test]
+    fn insert_text_at_end() {
+        let mut table = Table::new("Hello".to_string());
+        table.insert(5, " World").unwrap();
+        assert_eq!(table.get_text(0, table.len()), "Hello World");
+    }
+
+    #[test]
+    fn insert_text_in_middle() {
+        let mut table = Table::new("Helo World".to_string());
+        table.insert(2, "l").unwrap();
+        assert_eq!(table.get_text(0, table.len()), "Hello World");
+    }
+
+    #[test]
+    fn insert_text_with_newlines_updates_lines() {
+        let mut table = Table::new("Hello".to_string());
+        table.insert(5, "\nWorld\n!").unwrap();
+        assert_eq!(table.lines(), 3);
+        assert_eq!(table.get_text(0, table.len()), "Hello\nWorld\n!");
+    }
+
+    #[test]
+    fn delete_text_at_start() {
+        let mut table = Table::new("Hello World".to_string());
+        table.delete(0, 6).unwrap();
+        assert_eq!(table.get_text(0, table.len()), "World");
+    }
+
+    #[test]
+    fn delete_text_at_end() {
+        let mut table = Table::new("Hello World".to_string());
+        table.delete(5, 6).unwrap();
+        assert_eq!(table.get_text(0, table.len()), "Hello");
+    }
+
+    #[test]
+    fn delete_text_in_middle() {
+        let mut table = Table::new("Hello cruel World".to_string());
+        table.delete(6, 6).unwrap();
+        assert_eq!(table.get_text(0, table.len()), "Hello World");
+    }
+
+    #[test]
+    fn delete_entire_content_results_in_empty() {
+        let mut table = Table::new("Hello".to_string());
+        table.delete(0, 5).unwrap();
+        assert_eq!(table.get_text(0, table.len()), "");
+        assert_eq!(table.len(), 0);
+        assert_eq!(table.lines(), 1);
+    }
+
+    #[test]
+    fn get_text_out_of_bounds_returns_empty() {
+        let table = Table::new("Hello".to_string());
+        assert_eq!(table.get_text(10, 5), "");
+    }
+
+    #[test]
+    fn offset_to_position_and_back() {
+        let table = Table::new("Hello\nWorld\n!".to_string());
+        let pos = table.offset_to_position(7);
+        assert_eq!(pos.line, 1);
+        assert_eq!(pos.column, 1);
+        let offset = table.position_to_offset(pos);
+        assert_eq!(offset, 7);
+    }
+
+    #[test]
+    fn offset_to_position_at_end() {
+        let table = Table::new("abc\ndef".to_string());
+        let pos = table.offset_to_position(7);
+        assert_eq!(pos.line, 1);
+        assert_eq!(pos.column, 3);
+    }
+
+    #[test]
+    fn position_to_offset_past_end_returns_total_length() {
+        let table = Table::new("abc\ndef".to_string());
+        let offset = table.position_to_offset(super::super::types::Position { line: 10, column: 10 });
+        assert_eq!(offset, table.len());
+    }
+
+    #[test]
+    fn insert_offset_out_of_bounds_returns_error() {
+        let mut table = Table::new("abc".to_string());
+        assert!(table.insert(10, "x").is_err());
+    }
+
+    #[test]
+    fn delete_range_out_of_bounds_returns_error() {
+        let mut table = Table::new("abc".to_string());
+        assert!(table.delete(2, 5).is_err());
     }
 }
