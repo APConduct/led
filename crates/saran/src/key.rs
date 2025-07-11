@@ -1,6 +1,7 @@
 
 
 bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct Modifiers: u8 {
         const SHIFT = 0b0000_0001;
         const CTRL = 0b0000_0010;
@@ -9,7 +10,36 @@ bitflags::bitflags! {
     }
 }
 
+impl Modifiers {
+    /// Checks if the Shift key is pressed.
+    pub fn shift(self) -> bool {
+        self.contains(Modifiers::SHIFT)
+    }
+
+    /// Checks if the Control key is pressed.
+    pub fn ctrl(self) -> bool {
+        self.contains(Modifiers::CTRL)
+    }
+
+    /// Checks if the Alt key is pressed.
+    pub fn alt(self) -> bool {
+        self.contains(Modifiers::ALT)
+    }
+
+    /// Checks if the Super (Meta) key is pressed.
+    pub fn super_key(self) -> bool {
+        self.contains(Modifiers::SUPER)
+    }
+}
+
+impl Default for Modifiers {
+    fn default() -> Self {
+        Modifiers::empty()
+    }
+}
+
 /// Represents keyboard keys that can be used in keyboard events.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Code {
     /// The Enter/Return key.
     Enter,
