@@ -58,7 +58,7 @@ pub struct Context<'a> {
     
 }
 
-trait Clipboard {
+pub trait Clipboard {
     fn get(&self) -> Option<String>;
     fn set(&mut self, contents: &str);
 }
