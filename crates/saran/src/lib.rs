@@ -1,13 +1,14 @@
 pub mod context;
-pub mod theme;
-pub mod style;
-pub mod layout;
-pub mod widget;
 pub mod event;
-pub mod point;
 pub mod key;
+pub mod layout;
+pub mod point;
+pub mod rect;
+pub mod size;
+pub mod style;
+pub mod theme;
+pub mod widget;
 pub mod window;
-mod size;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

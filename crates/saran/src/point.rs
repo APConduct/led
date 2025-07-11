@@ -50,6 +50,38 @@ impl<T> Point<T> {
         Self { x: tuple.0, y: tuple.1 }
     }
 
+    /// Calculates the Euclidean distance from this point to another point.
+    ///
+    /// # Type Parameters
+    /// - `U`: A type that can be converted into a `Point<T>`.
+    ///
+    /// # Arguments
+    /// * `other` - The other point, which can be converted into a `Point<T>`.
+    ///
+    /// # Returns
+    /// The Euclidean distance between `self` and `other` as an `f64`.
+    ///
+    /// # Requirements
+    /// - `T` must implement `Into<f64>` and `Copy`.
+    ///
+    /// # Example
+    /// ```
+    /// use crate::saran::point::Point;
+    /// let p1 = Point::new(0.0, 0.0);
+    /// let p2 = Point::new(3.0, 4.0);
+    /// let dist = p1.distance_from(p2);
+    /// assert_eq!(dist, 5.0);
+    /// ```
+    pub fn distance_from<U: Into<Point<T>>>(self, other: U) -> f64
+    where
+        T: Into<f64> + Copy,
+    {
+        let other_point = other.into();
+        let dx = self.x.into() - other_point.x.into();
+        let dy = self.y.into() - other_point.y.into();
+        (dx * dx + dy * dy).sqrt()
+    }
+
     /// Applies a function to both coordinates, consuming the point.
     ///
     /// # Arguments
@@ -308,6 +340,14 @@ impl std::ops::Neg for Point<String> {
     }
 }
 
+// impl from for tuple
+impl<T> From<(T, T)> for Point<T> {
+    /// Converts a tuple `(x, y)` into a `Point<T>`.
+    fn from(tuple: (T, T)) -> Self {
+        Point::from_tuple(tuple)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -494,5 +534,51 @@ mod tests {
         let p = Point::new(0i32, -1i32);
         let p2 = p.map(|v| v.abs());
         assert_eq!(p2, Point::new(0, 1));
+    }
+
+    #[test]
+    fn distance_from_returns_zero_for_same_point() {
+        let p = Point::new(1.0, 2.0);
+        let dist = p.distance_from(Point::new(1.0, 2.0));
+        assert_eq!(dist, 0.0);
+    }
+
+    #[test]
+    fn distance_from_works_for_positive_coordinates() {
+        let p1 = Point::new(0.0, 0.0);
+        let p2 = Point::new(3.0, 4.0);
+        let dist = p1.distance_from(p2);
+        assert_eq!(dist, 5.0);
+    }
+
+    #[test]
+    fn distance_from_works_for_negative_coordinates() {
+        let p1 = Point::new(-1.0, -2.0);
+        let p2 = Point::new(-4.0, -6.0);
+        let dist = p1.distance_from(p2);
+        assert!((dist - 5.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn distance_from_works_for_mixed_sign_coordinates() {
+        let p1 = Point::new(-1.0, 2.0);
+        let p2 = Point::new(3.0, -2.0);
+        let dist = p1.distance_from(p2);
+        assert!((dist - 5.656854249).abs() < 1e-6);
+    }
+
+    #[test]
+    fn distance_from_accepts_tuple_as_other() {
+        let p = Point::new(1.0, 1.0);
+        let dist = p.distance_from((4.0, 5.0));
+        assert_eq!(dist, 5.0);
+    }
+
+    #[test]
+    fn distance_from_works_with_integer_coordinates() {
+        let p1 = Point::new(0, 0);
+        let p2 = Point::new(6, 8);
+        let dist = p1.distance_from(p2);
+        assert_eq!(dist, 10.0);
     }
 }
