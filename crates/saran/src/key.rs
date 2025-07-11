@@ -1,38 +1,45 @@
-
-
 bitflags::bitflags! {
+    /// Modifier keys for keyboard input, represented as bitflags.
+    ///
+    /// This struct allows checking for the presence of modifier keys such as Shift, Control, Alt, and Super (Meta).
+    /// Each modifier is represented as a single bit in a `u8`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct Modifiers: u8 {
+        /// The Shift key modifier.
         const SHIFT = 0b0000_0001;
+        /// The Control key modifier.
         const CTRL = 0b0000_0010;
+        /// The Alt key modifier.
         const ALT = 0b0000_0100;
+        /// The Super (Meta/Windows/Command) key modifier.
         const SUPER = 0b0000_1000; // Meta key (Windows/Command)
     }
 }
 
 impl Modifiers {
-    /// Checks if the Shift key is pressed.
+    /// Returns `true` if the Shift key is pressed.
     pub fn shift(self) -> bool {
         self.contains(Modifiers::SHIFT)
     }
 
-    /// Checks if the Control key is pressed.
+    /// Returns `true` if the Control key is pressed.
     pub fn ctrl(self) -> bool {
         self.contains(Modifiers::CTRL)
     }
 
-    /// Checks if the Alt key is pressed.
+    /// Returns `true` if the Alt key is pressed.
     pub fn alt(self) -> bool {
         self.contains(Modifiers::ALT)
     }
 
-    /// Checks if the Super (Meta) key is pressed.
+    /// Returns `true` if the Super (Meta/Windows/Command) key is pressed.
     pub fn super_key(self) -> bool {
         self.contains(Modifiers::SUPER)
     }
 }
 
 impl Default for Modifiers {
+    /// Returns an empty set of modifiers (no modifier keys pressed).
     fn default() -> Self {
         Modifiers::empty()
     }
@@ -193,4 +200,72 @@ pub enum Code {
     PrintScreen,
     /// Any other key, specified by its numeric code.
     Other(u32),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn modifiers_shift_ctrl_alt_super_detection() {
+        let mods = Modifiers::SHIFT | Modifiers::CTRL | Modifiers::ALT | Modifiers::SUPER;
+        assert!(mods.shift());
+        assert!(mods.ctrl());
+        assert!(mods.alt());
+        assert!(mods.super_key());
+    }
+
+    #[test]
+    fn modifiers_individual_keys() {
+        let shift = Modifiers::SHIFT;
+        let ctrl = Modifiers::CTRL;
+        let alt = Modifiers::ALT;
+        let super_key = Modifiers::SUPER;
+
+        assert!(shift.shift());
+        assert!(!shift.ctrl());
+        assert!(!shift.alt());
+        assert!(!shift.super_key());
+
+        assert!(!ctrl.shift());
+        assert!(ctrl.ctrl());
+        assert!(!ctrl.alt());
+        assert!(!ctrl.super_key());
+
+        assert!(!alt.shift());
+        assert!(!alt.ctrl());
+        assert!(alt.alt());
+        assert!(!alt.super_key());
+
+        assert!(!super_key.shift());
+        assert!(!super_key.ctrl());
+        assert!(!super_key.alt());
+        assert!(super_key.super_key());
+    }
+
+    #[test]
+    fn modifiers_default_is_empty() {
+        let mods = Modifiers::default();
+        assert!(!mods.shift());
+        assert!(!mods.ctrl());
+        assert!(!mods.alt());
+        assert!(!mods.super_key());
+        assert_eq!(mods, Modifiers::empty());
+    }
+
+    #[test]
+    fn code_enum_variants_are_distinct() {
+        assert_ne!(Code::Enter, Code::Escape);
+        assert_ne!(Code::A, Code::B);
+        assert_ne!(Code::F1, Code::F2);
+        assert_ne!(Code::LeftShift, Code::RightShift);
+    }
+
+    #[test]
+    fn code_other_variant_accepts_any_u32() {
+        let code1 = Code::Other(42);
+        let code2 = Code::Other(9999);
+        assert_eq!(code1, Code::Other(42));
+        assert_ne!(code1, code2);
+    }
 }

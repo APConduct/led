@@ -163,7 +163,6 @@ mod tests {
             panic!("Expected MouseMove event");
         }
     }
-
     #[test]
     fn test_mouse_wheel_event() {
         let event = Event::MouseWheel {

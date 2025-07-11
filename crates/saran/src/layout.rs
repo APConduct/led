@@ -54,3 +54,65 @@ pub struct Context<'a> {
     pub theme: Option<&'a Theme>,
     pub relayout_requested: bool,
 }
+
+impl<'a> Context<'a> {
+    /// Creates a new `Context` with the specified available space and layout direction.
+    ///
+    /// # Parameters
+    /// - `available_space`: The size of the area available for layout.
+    /// - `direction`: The primary layout direction (horizontal or vertical).
+    /// - `theme`: An optional reference to the current theme for styling.
+    ///
+    /// # Returns
+    /// A new `Context` instance initialized with the provided parameters.
+    pub fn new(available_space: ScreenSize, direction: Direction, theme: Option<&'a Theme>) -> Self {
+        Self {
+            available_space,
+            direction,
+            theme,
+            relayout_requested: false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::style::System;
+    use crate::size::Size;
+    #[test]
+    fn creates_empty_cache() {
+        let cache = Cache::new();
+        assert!(cache.text_layouts.is_empty());
+        assert!(cache.glyph_cache.is_empty());
+    }
+
+    #[test]
+    fn context_initializes_with_given_parameters() {
+        let available_space = Size { width: 100.0, height: 50.0 };
+        let style_system = System::new();
+        let theme = style_system.get_active_theme();
+        let ctx = Context::new(available_space, Direction::Horizontal, Some(&theme));
+        assert_eq!(ctx.available_space.width, 100.0);
+        assert_eq!(ctx.available_space.height, 50.0);
+        matches!(ctx.direction, Direction::Horizontal);
+        assert!(ctx.theme.is_some());
+        assert!(!ctx.relayout_requested);
+    }
+
+    #[test]
+    fn context_allows_none_theme() {
+        let available_space = Size { width: 0.0, height: 0.0 };
+        let ctx = Context::new(available_space, Direction::Vertical, None);
+        assert!(ctx.theme.is_none());
+        matches!(ctx.direction, Direction::Vertical);
+    }
+
+    #[test]
+    fn context_handles_zero_available_space() {
+        let available_space = Size { width: 0.0, height: 0.0 };
+        let ctx = Context::new(available_space, Direction::Horizontal, None);
+        assert_eq!(ctx.available_space.width, 0.0);
+        assert_eq!(ctx.available_space.height, 0.0);
+    }
+}
