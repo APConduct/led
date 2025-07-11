@@ -45,7 +45,7 @@ impl Label {
 pub struct ID(pub u64);
 
 pub trait Widget: Draw {
-    fn layout(&mut self, ctx: &LayoutContext);
+    fn layout(&mut self, ctx: &mut LayoutContext);
     fn handle_event(&mut self, event: &Event);
     // More widget-specific methods can be added here
 }
@@ -82,7 +82,7 @@ impl Column {
 }
 
 impl Widget for Column {
-    fn layout(&mut self, ctx: &LayoutContext) {
+    fn layout(&mut self, ctx: &mut LayoutContext) {
         // Simple vertical stacking: each child is laid out below the previous one.
         for child in &mut self.children {
             child.layout(ctx);
