@@ -462,7 +462,7 @@ mod tests {
 
     #[test]
     fn map_x_mut_ref_and_map_y_mut_ref_apply_mutable_function() {
-        let mut p = Point::new(2, 3);
+        let p = Point::new(2, 3);
         let px = p.clone().map_x_mut_ref(|v| {
             *v += 1;
             *v
