@@ -13,15 +13,15 @@
 /// ```
 /// use crate::saran::point::Point;
 /// let p = Point::new(1, 2);
-/// assert_eq!(p.x, 1);
-/// assert_eq!(p.y, 2);
+/// assert_eq!(p.x(), 1);
+/// assert_eq!(p.y(), 2);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Point<T> {
     /// The x coordinate.
-    pub x: T,
+    x: T,
     /// The y coordinate.
-    pub y: T,
+    y: T,
 }
 
 impl<T> Point<T> {
@@ -31,13 +31,13 @@ impl<T> Point<T> {
     }
 
     /// Returns a reference to the x coordinate.
-    pub fn x(&self) -> &T {
-        &self.x
+    pub fn x(&self) -> T where T: Copy{
+        self.x
     }
 
     /// Returns a reference to the y coordinate.
-    pub fn y(&self) -> &T {
-        &self.y
+    pub fn y(&self) -> T where T: Copy{
+        self.y
     }
 
     /// Converts the point into a tuple `(x, y)`.
@@ -355,8 +355,8 @@ mod tests {
     #[test]
     fn creates_point_and_accesses_coordinates() {
         let p = Point::new(3, 4);
-        assert_eq!(*p.x(), 3);
-        assert_eq!(*p.y(), 4);
+        assert_eq!(p.x(), 3);
+        assert_eq!(p.y(), 4);
         assert_eq!(p.into_tuple(), (3, 4));
     }
 

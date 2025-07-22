@@ -2,15 +2,37 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Size<T> {
     /// The width component.
-    pub width: T,
+    width: T,
     /// The height component.
-    pub height: T,
+    height: T,
 }
 
 impl<T> Size<T> {
     /// Creates a new `Size` from width and height.
     pub fn new(width: T, height: T) -> Self {
         Self { width, height }
+    }
+
+    /// Returns the width component of the size.
+    ///
+    /// # Returns
+    /// The width as type `T`.
+    pub fn width(&self) -> T
+    where
+        T: Copy,
+    {
+        self.width
+    }
+
+    /// Returns the height component of the size.
+    ///
+    /// # Returns
+    /// The height as type `T`.
+    pub fn height(&self) -> T
+    where
+        T: Copy,
+    {
+        self.height
     }
 
     /// Returns `true` if both width and height are the default value.
@@ -66,10 +88,10 @@ impl<T> Size<T> {
     where
         F: Fn(T) -> U,
     {
-        Size {
-            width: f(self.width),
-            height: f(self.height),
-        }
+        Size ::new(
+             f(self.width),
+             f(self.height),
+        )
     }
 
     /// Maps width and height pairwise using the provided function.
@@ -80,10 +102,10 @@ impl<T> Size<T> {
         T: Copy,
         F: Fn(T, T) -> U,
     {
-        Size {
-            width: f(self.width, self.height),
-            height: f(self.height, self.width),
-        }
+        Size::new(
+             f(self.width, self.height),
+            f(self.height, self.width),
+        )
     }
 
     /// Zips two sizes into a size of tuples.

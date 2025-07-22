@@ -89,12 +89,12 @@ mod tests {
 
     #[test]
     fn context_initializes_with_given_parameters() {
-        let available_space = Size { width: 100.0, height: 50.0 };
+        let available_space = Size::new(100.0, 50.0);
         let style_system = System::new();
         let theme = style_system.get_active_theme();
         let ctx = Context::new(available_space, Direction::Horizontal, Some(&theme));
-        assert_eq!(ctx.available_space.width, 100.0);
-        assert_eq!(ctx.available_space.height, 50.0);
+        assert_eq!(ctx.available_space.width(), 100.0);
+        assert_eq!(ctx.available_space.height(), 50.0);
         matches!(ctx.direction, Direction::Horizontal);
         assert!(ctx.theme.is_some());
         assert!(!ctx.relayout_requested);
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn context_allows_none_theme() {
-        let available_space = Size { width: 0.0, height: 0.0 };
+        let available_space = Size::new(0.0, 0.0);
         let ctx = Context::new(available_space, Direction::Vertical, None);
         assert!(ctx.theme.is_none());
         matches!(ctx.direction, Direction::Vertical);
@@ -110,9 +110,9 @@ mod tests {
 
     #[test]
     fn context_handles_zero_available_space() {
-        let available_space = Size { width: 0.0, height: 0.0 };
+        let available_space = Size::new( 0.0,  0.0 );
         let ctx = Context::new(available_space, Direction::Horizontal, None);
-        assert_eq!(ctx.available_space.width, 0.0);
-        assert_eq!(ctx.available_space.height, 0.0);
+        assert_eq!(ctx.available_space.width(), 0.0);
+        assert_eq!(ctx.available_space.height(), 0.0);
     }
 }

@@ -8,9 +8,9 @@ use crate::size::Size;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Rect<T> {
     /// The origin (top-left corner) of the rectangle.
-    pub origin: Point<T>,
+    origin: Point<T>,
     /// The size (width and height) of the rectangle.
-    pub size: Size<T>,
+    size: Size<T>,
 }
 
 impl<T> Rect<T> {
@@ -26,6 +26,28 @@ impl<T> Rect<T> {
         Self { origin, size }
     }
 
+    /// Returns the x-coordinate of the rectangle's origin.
+    ///
+    /// # Returns
+    /// The x-coordinate as type `T`.
+    pub fn x(&self) -> T
+    where
+        T: Copy,
+    {
+        self.origin.x()
+    }
+
+    /// Returns the y-coordinate of the rectangle's origin.
+    ///
+    /// # Returns
+    /// The y-coordinate as type `T`.
+    pub fn y(&self) -> T
+    where
+        T: Copy,
+    {
+        self.origin.y()
+    }
+
     /// Returns the width of the rectangle.
     ///
     /// # Returns
@@ -34,7 +56,7 @@ impl<T> Rect<T> {
     where
         T: Copy,
     {
-        self.size.width
+        self.size.width()
     }
 
     /// Returns the height of the rectangle.
@@ -45,7 +67,29 @@ impl<T> Rect<T> {
     where
         T: Copy,
     {
-        self.size.height
+        self.size.height()
+    }
+
+    /// Returns the size (width and height) of the rectangle.
+    ///
+    /// # Returns
+    /// The size as a `Size<T>`.
+    pub fn size(&self) -> Size<T>
+    where
+        T: Copy,
+    {
+        self.size
+    }
+
+    /// Returns the origin (top-left corner) of the rectangle.
+    ///
+    /// # Returns
+    /// The origin as a `Point<T>`.
+    pub fn origin(&self) -> Point<T>
+    where
+        T: Copy,
+    {
+        self.origin
     }
 
     /// Calculates the area of the rectangle.
@@ -80,7 +124,7 @@ impl<T> Rect<T> {
     {
         let half_width = self.width() / T::from(2u8);
         let half_height = self.height() / T::from(2u8);
-        Point::new(self.origin.x + half_width, self.origin.y + half_height)
+        Point::new(self.origin.x() + half_width, self.origin.y() + half_height)
     }
 
     /// Checks if the rectangle contains a given point.
@@ -94,12 +138,12 @@ impl<T> Rect<T> {
     where
         T: Copy + std::ops::Add<Output = T> + std::ops::Sub<Output = T> + PartialOrd,
     {
-        let x_min = self.origin.x;
-        let y_min = self.origin.y;
+        let x_min = self.origin.x();
+        let y_min = self.origin.y();
         let x_max = x_min + self.width();
         let y_max = y_min + self.height();
 
-        point.x >= x_min && point.x < x_max && point.y >= y_min && point.y < y_max
+        point.x() >= x_min && point.x() < x_max && point.y() >= y_min && point.y() < y_max
     }
 
     /// Checks if this rectangle intersects with another rectangle.
@@ -113,13 +157,13 @@ impl<T> Rect<T> {
     where
         T: Copy + std::ops::Add<Output = T> + std::ops::Sub<Output = T> + PartialOrd,
     {
-        let x_min = self.origin.x;
-        let y_min = self.origin.y;
+        let x_min = self.x();
+        let y_min = self.y();
         let x_max = x_min + self.width();
         let y_max = y_min + self.height();
 
-        let other_x_min = other.origin.x;
-        let other_y_min = other.origin.y;
+        let other_x_min = other.x();
+        let other_y_min = other.y();
         let other_x_max = other_x_min + other.width();
         let other_y_max = other_y_min + other.height();
 
@@ -142,8 +186,8 @@ mod tests {
         let origin = Point::new(1, 2);
         let size = Size::new(3, 4);
         let rect = Rect::new(origin, size);
-        assert_eq!(rect.origin, origin);
-        assert_eq!(rect.size, size);
+        assert_eq!(rect.origin(), origin);
+        assert_eq!(rect.size(), size);
     }
 
     #[test]

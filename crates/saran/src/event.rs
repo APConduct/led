@@ -119,7 +119,7 @@ mod tests {
     use crate::key::Modifiers;
 
     fn dummy_point() -> Point<f32> {
-        Point { x: 1.0, y: 2.0 }
+        Point::new( 1.0, 2.0 )
     }
 
     #[test]
@@ -154,11 +154,11 @@ mod tests {
     fn test_mouse_move_event() {
         let event = Event::MouseMove {
             position: dummy_point(),
-            delta: Point { x: 0.5, y: 0.5 },
+            delta: Point::new(0.5, 0.5),
         };
         if let Event::MouseMove { position, delta } = event {
             assert_eq!(position, dummy_point());
-            assert_eq!(delta, Point { x: 0.5, y: 0.5 });
+            assert_eq!(delta, Point::new(0.5, 0.5));
         } else {
             panic!("Expected MouseMove event");
         }
@@ -166,11 +166,11 @@ mod tests {
     #[test]
     fn test_mouse_wheel_event() {
         let event = Event::MouseWheel {
-            delta: Point { x: 0.0, y: 1.0 },
+            delta: Point::new(0.0, 1.0),
             position: dummy_point(),
         };
         if let Event::MouseWheel { delta, position } = event {
-            assert_eq!(delta, Point { x: 0.0, y: 1.0 });
+            assert_eq!(delta, Point::new(0.0, 1.0));
             assert_eq!(position, dummy_point());
         } else {
             panic!("Expected MouseWheel event");
