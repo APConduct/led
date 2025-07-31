@@ -88,10 +88,7 @@ impl<T> Size<T> {
     where
         F: Fn(T) -> U,
     {
-        Size ::new(
-             f(self.width),
-             f(self.height),
-        )
+        Size::new(f(self.width), f(self.height))
     }
 
     /// Maps width and height pairwise using the provided function.
@@ -102,10 +99,7 @@ impl<T> Size<T> {
         T: Copy,
         F: Fn(T, T) -> U,
     {
-        Size::new(
-             f(self.width, self.height),
-            f(self.height, self.width),
-        )
+        Size::new(f(self.width, self.height), f(self.height, self.width))
     }
 
     /// Zips two sizes into a size of tuples.
