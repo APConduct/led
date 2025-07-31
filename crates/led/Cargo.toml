@@ -12,3 +12,4 @@ eframe = "0.32.0"
 saran = { path = "../saran" }                             # Saran library
 mlua = { version = "0.9.0", features = ["lua54"] }        # Lua 5.4 support
 egui = "0.32.0"
+rfd = "0.15.4"

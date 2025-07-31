@@ -8,7 +8,9 @@ pub mod edtr {
         types::{Position, Range},
     };
     use egui::{Rect, Ui};
+    use rfd::FileDialog;
     use saran::{context::Context as GuiContext, theme::Theme};
+    use std::fs;
 
     pub struct App {
         edtr_state: State,
@@ -138,11 +140,57 @@ fn main() {
                     }
 
                     if ui.button("Open").clicked() {
-                        todo!("Implement Open functionality");
+                        if let Some(path) = FileDialog::new().pick_file() {
+                            match fs::read_to_string(&path) {
+                                Ok(content) => {
+                                    let buffer_id = self.edtr_state.create_buffer(content);
+                                    // Store file path in buffer metadata
+                                    if let Some(meta) =
+                                        self.edtr_state.buffer_metadata.get_mut(&buffer_id)
+                                    {
+                                        meta.file_path = Some(path.to_string_lossy().to_string());
+                                        meta.modified = false;
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to open file: {}", e);
+                                }
+                            }
+                        }
                     }
 
                     if ui.button("Save").clicked() {
-                        todo!("Implement Save functionality");
+                        if let Some(buffer_id) = self.edtr_state.get_active_buffer() {
+                            let file_path = self
+                                .edtr_state
+                                .buffer_metadata
+                                .get(&buffer_id)
+                                .and_then(|meta| meta.file_path.clone())
+                                .or_else(|| {
+                                    FileDialog::new()
+                                        .save_file()
+                                        .map(|p| p.to_string_lossy().to_string())
+                                });
+
+                            if let Some(path) = file_path {
+                                if let Some(content) = self.edtr_state.get_buffer_text(buffer_id) {
+                                    match fs::write(&path, content) {
+                                        Ok(_) => {
+                                            // Update buffer metadata
+                                            if let Some(meta) =
+                                                self.edtr_state.buffer_metadata.get_mut(&buffer_id)
+                                            {
+                                                meta.file_path = Some(path);
+                                                meta.modified = false;
+                                            }
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to save file: {}", e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     ui.separator();
