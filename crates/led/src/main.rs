@@ -1,9 +1,4 @@
-use anyhow::Result as AnyResult;
 use eframe::egui;
-use led::led::*;
-use mlua::Lua;
-use saran::context::Context;
-use std::collections::HashMap;
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
@@ -22,7 +17,6 @@ fn main() -> Result<(), eframe::Error> {
 
 pub mod lua {
     use anyhow::Result as AnyResult;
-    use std::collections::HashMap;
 
     use led::led::commands::editor::Command;
     use mlua::Lua;
@@ -124,7 +118,7 @@ return nil
 pub mod txt {
     pub mod edtr {
         use super::super::lua::Runtime;
-        use egui::{Context as EguiContext, Rect, Ui};
+        use egui::{Rect, Ui};
         use led::led::{
             buffer::editor::State,
             commands::editor::{self, Response},
