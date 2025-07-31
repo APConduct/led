@@ -281,101 +281,152 @@ fn main() {
                 text_changed: false,
             };
 
-            // Get buffer text up front
+            // Get buffer text and cursor state
             let text = self.edtr_state.get_buffer_text(self.buffer_id)?.to_string();
-            // Get cursor state up front
             let mut crsr_state = self.edtr_state.get_cursor_state(self.buffer_id)?.clone();
 
             let font_id = egui::FontId::monospace(self.font_size);
             let line_height = ui.fonts(|f| f.row_height(&font_id));
             let char_width = ui.fonts(|f| f.glyph_width(&font_id, ' '));
 
-            let scroll_area = egui::ScrollArea::both()
+            let line_count = text.lines().count();
+            let max_line_length = text.lines().map(|l| l.len()).max().unwrap_or(0);
+
+            // Calculate content size for scrolling
+            let line_number_width = if self.show_line_numbers {
+                let digits = line_count.to_string().len();
+                (digits as f32 * char_width) + (char_width * 2.0)
+            } else {
+                0.0
+            };
+            let content_width = LEFT_PADDING
+                + TEXT_LEFT_PADDING
+                + line_number_width
+                + (max_line_length as f32 * char_width)
+                + 100.0;
+            let content_height =
+                TOP_PADDING + TEXT_TOP_PADDING + (line_count as f32 * line_height) + 100.0;
+
+            // Scroll area for both axes
+            // Calculate minimum allocation based on available viewport
+            let min_width = ui.available_width();
+            let min_height = ui.available_height();
+            let alloc_width = content_width.max(min_width);
+            let alloc_height = content_height.max(min_height);
+
+            egui::ScrollArea::both()
                 .auto_shrink([false, false])
                 .stick_to_right(false)
-                .stick_to_bottom(false);
+                .stick_to_bottom(false)
+                .show(ui, |ui| {
+                    // Allocate the full content area (fixed for morphing/jank)
+                    let (rect, _response) = ui.allocate_exact_size(
+                        egui::vec2(alloc_width, alloc_height),
+                        egui::Sense::hover(),
+                    );
 
-            scroll_area.show(ui, |ui| {
-                // The text area will naturally overflow if buffer is large, enabling scrolling
+                    let theme = self.gui_ctx.style_system.get_active_theme().clone();
+                    let origin = ui.min_rect().min;
 
-                let line_number_width = if self.show_line_numbers {
-                    let line_count = text.lines().count();
-                    let digits = line_count.to_string().len();
-                    (digits as f32 * char_width) + (char_width * 2.0)
-                } else {
-                    0.0
-                };
-                let font_id = egui::FontId::monospace(self.font_size);
-                let theme = self.gui_ctx.style_system.get_active_theme().clone();
-                let mut y = TOP_PADDING + TEXT_TOP_PADDING + line_height;
-                for (line_num, line) in text.lines().enumerate() {
-                    // Draw line number
-                    let mut x = LEFT_PADDING;
-                    if self.show_line_numbers {
-                        let line_text = format!("{:>4}", line_num + 1);
-                        let pos = egui::pos2(LEFT_PADDING, y);
+                    // Paint background
+                    ui.painter()
+                        .rect_filled(rect, egui::Rounding::ZERO, theme.background);
+
+                    // Paint line numbers and text
+                    let mut y = origin.y + TOP_PADDING + TEXT_TOP_PADDING;
+                    for (line_num, line) in text.lines().enumerate() {
+                        let mut x = origin.x + LEFT_PADDING;
+                        if self.show_line_numbers {
+                            let line_text = format!("{:>4}", line_num + 1);
+                            let pos = egui::pos2(origin.x + LEFT_PADDING, y);
+                            ui.painter().text(
+                                pos,
+                                egui::Align2::LEFT_TOP,
+                                line_text,
+                                font_id.clone(),
+                                theme.line_numbers,
+                            );
+                            x += line_number_width;
+                        }
+                        x += TEXT_LEFT_PADDING;
+                        let color = if line.trim_start().starts_with("//") {
+                            egui::Color32::from_rgb(128, 128, 128)
+                        } else if line.contains("fn ") || line.contains("let ") {
+                            egui::Color32::from_rgb(198, 120, 221)
+                        } else {
+                            theme.foreground
+                        };
+                        let pos = egui::pos2(x, y);
                         ui.painter().text(
                             pos,
                             egui::Align2::LEFT_TOP,
-                            line_text,
+                            line,
                             font_id.clone(),
-                            theme.line_numbers,
+                            color,
                         );
-                        x += line_number_width;
+                        y += line_height;
                     }
-                    // Draw text with extra left padding
-                    x += TEXT_LEFT_PADDING;
-                    let color = if line.trim_start().starts_with("//") {
-                        egui::Color32::from_rgb(128, 128, 128)
-                    } else if line.contains("fn ") || line.contains("let ") {
-                        egui::Color32::from_rgb(198, 120, 221)
-                    } else {
-                        theme.foreground
-                    };
-                    let pos = egui::pos2(x, y);
-                    ui.painter()
-                        .text(pos, egui::Align2::LEFT_TOP, line, font_id.clone(), color);
-                    y += line_height;
-                }
-                // Render selection and cursor after text, with x offset for line numbers
-                // (moved after the loop to avoid borrow checker issues)
-                let selection = crsr_state.selection().unwrap_or_else(|| Range {
-                    start: Position { line: 0, column: 0 },
-                    end: Position { line: 0, column: 0 },
-                });
-                self.render_selection(
-                    ui,
-                    &text,
-                    selection,
-                    line_height,
-                    char_width,
-                    &theme,
-                    line_number_width,
-                );
-                self.render_cursor(
-                    ui,
-                    &crsr_state,
-                    line_height,
-                    char_width,
-                    &theme,
-                    line_number_width,
-                );
 
-                // TODO: Auto-scroll to cursor after edits/cursor movement
-                // Example: use ui.scroll_to_rect(cursor_rect, Some(egui::Align::Center));
-            });
-            self.handle_input(ui, &mut response);
+                    // Render selection and cursor after text
+                    let selection = crsr_state.selection().unwrap_or_else(|| Range {
+                        start: Position { line: 0, column: 0 },
+                        end: Position { line: 0, column: 0 },
+                    });
+                    self.render_selection(
+                        ui,
+                        &text,
+                        selection,
+                        line_height,
+                        char_width,
+                        &theme,
+                        line_number_width,
+                    );
+                    self.render_cursor(
+                        ui,
+                        &crsr_state,
+                        line_height,
+                        char_width,
+                        &theme,
+                        line_number_width,
+                    );
+
+                    // Corrected cursor position (relative to scroll area origin)
+                    let cursor_x = crsr_state.position().column as f32 * char_width
+                        + origin.x
+                        + LEFT_PADDING
+                        + line_number_width
+                        + TEXT_LEFT_PADDING;
+                    let cursor_y = crsr_state.position().line as f32 * line_height
+                        + origin.y
+                        + TOP_PADDING
+                        + TEXT_TOP_PADDING;
+                    let cursor_rect = egui::Rect::from_min_size(
+                        egui::pos2(cursor_x, cursor_y),
+                        egui::vec2(2.0, line_height),
+                    );
+
+                    // Only scroll to cursor if it moved (fixes snapping/acceleration bug)
+                    if response.cursor_moved {
+                        ui.scroll_to_rect(cursor_rect, Some(egui::Align::Center));
+                    }
+
+                    // Handle input (mouse and keyboard) with scroll offset
+                    self.handle_input_with_scroll(
+                        ui,
+                        rect.min,
+                        line_height,
+                        char_width,
+                        &mut response,
+                        line_number_width,
+                    );
+                });
+
             // Immediately execute commands so state is up-to-date
             for command in &response.commands {
                 let _ = self.edtr_state.execute_command(command.clone());
             }
             // Always refetch the updated cursor state after executing commands
             crsr_state = self.edtr_state.get_cursor_state(self.buffer_id)?.clone();
-
-            // Use the refreshed cursor state for rendering selection and cursor
-            // (and for any further input logic if needed)
-            // The following rendering logic uses crsr_state:
-            // (Note: If you use crsr_state elsewhere, update those usages too)
 
             Some(response)
         }
@@ -480,13 +531,21 @@ fn main() {
             }
         }
 
-        fn handle_input(&mut self, ui: &mut egui::Ui, response: &mut editor::Response) {
-            // Handle keyboard input
+        // Helper: handle input with scroll offset
+        fn handle_input_with_scroll(
+            &mut self,
+            ui: &mut egui::Ui,
+            scroll_origin: egui::Pos2,
+            line_height: f32,
+            char_width: f32,
+            response: &mut editor::Response,
+            line_number_width: f32,
+        ) {
+            // Keyboard input (unchanged)
             ui.input(|i| {
                 for event in &i.events {
                     match event {
                         egui::Event::Text(text) => {
-                            // Insert text at refreshed cursor position
                             if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
                                 let buffer =
                                     self.edtr_state.buffers().get(&self.buffer_id).unwrap();
@@ -500,9 +559,8 @@ fn main() {
 
                                 response.text_changed = true;
 
-                                // Advance cursor right by one column after insert
                                 let mut new_pos = cursor.position();
-                                new_pos.column += text.chars().count(); // Usually 1, but supports paste
+                                new_pos.column += text.chars().count();
                                 response.commands.push(editor::Command::MoveCursor {
                                     buffer_id: self.buffer_id,
                                     position: new_pos,
@@ -510,7 +568,6 @@ fn main() {
                                 response.cursor_moved = true;
                             }
                         }
-
                         egui::Event::Key {
                             key,
                             pressed: true,
@@ -519,25 +576,24 @@ fn main() {
                         } => {
                             self.handle_key_event(*key, *modifiers, response);
                         }
-
                         _ => {}
                     }
                 }
             });
 
-            // Handle mouse input
+            // Mouse input, adjusting for scroll offset
             if ui.rect_contains_pointer(ui.available_rect_before_wrap()) {
                 if ui.input(|i| i.pointer.primary_clicked()) {
                     if let Some(pos) = ui.input(|i| i.pointer.interact_pos()) {
-                        // Convert mouse position to text position
-                        let line_height =
-                            ui.fonts(|f| f.row_height(&egui::FontId::monospace(self.font_size)));
-                        let char_width = ui.fonts(|f| {
-                            f.glyph_width(&egui::FontId::monospace(self.font_size), ' ')
-                        });
-
-                        let line = (pos.y / line_height) as usize;
-                        let column = (pos.x / char_width) as usize;
+                        // Convert mouse position to text position, subtracting scroll origin
+                        let local_pos = pos - scroll_origin;
+                        let line = ((local_pos.y - TOP_PADDING - TEXT_TOP_PADDING - line_height)
+                            / line_height)
+                            .max(0.0) as usize;
+                        let column =
+                            ((local_pos.x - LEFT_PADDING - line_number_width - TEXT_LEFT_PADDING)
+                                / char_width)
+                                .max(0.0) as usize;
 
                         response.commands.push(editor::Command::MoveCursor {
                             buffer_id: self.buffer_id,
@@ -564,14 +620,16 @@ fn main() {
             let cursor_visible = (self.cursor_blink_time * 2.0) % 2.0 < 1.0;
 
             if cursor_visible {
+                let origin = ui.min_rect().min;
                 let cursor_x = cursor_state.position().column as f32 * char_width
+                    + origin.x
                     + LEFT_PADDING
                     + line_number_width
                     + TEXT_LEFT_PADDING;
                 let cursor_y = cursor_state.position().line as f32 * line_height
+                    + origin.y
                     + TOP_PADDING
-                    + TEXT_TOP_PADDING
-                    + line_height;
+                    + TEXT_TOP_PADDING;
 
                 ui.painter().line_segment(
                     [
