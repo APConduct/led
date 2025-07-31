@@ -83,6 +83,7 @@ fn main() {
                 }
             }
 
+            // Ensure scroll area fills the central panel
             egui::CentralPanel::default().show(ctx, |ui| {
                 self.render_editor_ui(ui);
             });
@@ -154,6 +155,7 @@ fn main() {
                                 }
                                 Err(e) => {
                                     eprintln!("Failed to open file: {}", e);
+                                    // TODO: Display error in UI instead of just printing to console
                                 }
                             }
                         }
@@ -186,6 +188,7 @@ fn main() {
                                         }
                                         Err(e) => {
                                             eprintln!("Failed to save file: {}", e);
+                                            // TODO: Display error in UI instead of just printing to console
                                         }
                                     }
                                 }
@@ -293,6 +296,8 @@ fn main() {
                 .stick_to_bottom(false);
 
             scroll_area.show(ui, |ui| {
+                // The text area will naturally overflow if buffer is large, enabling scrolling
+
                 let line_number_width = if self.show_line_numbers {
                     let line_count = text.lines().count();
                     let digits = line_count.to_string().len();
@@ -355,6 +360,9 @@ fn main() {
                     &theme,
                     line_number_width,
                 );
+
+                // TODO: Auto-scroll to cursor after edits/cursor movement
+                // Example: use ui.scroll_to_rect(cursor_rect, Some(egui::Align::Center));
             });
             self.handle_input(ui, &mut response);
             // Immediately execute commands so state is up-to-date
