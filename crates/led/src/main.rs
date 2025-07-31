@@ -317,10 +317,10 @@ fn main() {
 
         // Padding constants for editor layout
         const TOP_PADDING: f32 = 4.0;
-        const LEFT_PADDING: f32 = 8.0;
+        const LEFT_PADDING: f32 = 4.0;
         // Additional padding for buffer text area
-        const TEXT_TOP_PADDING: f32 = 4.0;
-        const TEXT_LEFT_PADDING: f32 = 8.0;
+        const TEXT_TOP_PADDING: f32 = 16.0;
+        const TEXT_LEFT_PADDING: f32 = 32.0;
 
         impl<'a> Widget<'a> {
             pub fn new(
