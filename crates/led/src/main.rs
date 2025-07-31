@@ -319,6 +319,9 @@ fn main() {
         // Padding constants for editor layout
         const TOP_PADDING: f32 = 4.0;
         const LEFT_PADDING: f32 = 8.0;
+        // Additional padding for buffer text area
+        const TEXT_TOP_PADDING: f32 = 4.0;
+        const TEXT_LEFT_PADDING: f32 = 8.0;
 
         impl<'a> Widget<'a> {
             pub fn new(
@@ -372,10 +375,10 @@ fn main() {
                     };
                     let font_id = egui::FontId::monospace(self.font_size);
                     let theme = self.gui_ctx.style_system.get_active_theme().clone();
-                    let mut y = TOP_PADDING;
+                    let mut y = TOP_PADDING + TEXT_TOP_PADDING;
                     for (line_num, line) in text.lines().enumerate() {
-                        let mut x = LEFT_PADDING;
                         // Draw line number
+                        let mut x = LEFT_PADDING;
                         if self.show_line_numbers {
                             let line_text = format!("{:>4}", line_num + 1);
                             let baseline_adjust = line_height * 0.2;
@@ -389,7 +392,8 @@ fn main() {
                             );
                             x += line_number_width;
                         }
-                        // Draw text
+                        // Draw text with extra left padding
+                        x += TEXT_LEFT_PADDING;
                         let color = if line.trim_start().starts_with("//") {
                             egui::Color32::from_rgb(128, 128, 128)
                         } else if line.contains("fn ") || line.contains("let ") {
