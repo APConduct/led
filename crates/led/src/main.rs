@@ -316,6 +316,10 @@ fn main() {
             scroll_offset: egui::Vec2,
         }
 
+        // Padding constants for editor layout
+        const TOP_PADDING: f32 = 4.0;
+        const LEFT_PADDING: f32 = 8.0;
+
         impl<'a> Widget<'a> {
             pub fn new(
                 buffer_id: led::led::buffer::ID,
@@ -359,7 +363,6 @@ fn main() {
                     .stick_to_bottom(false);
 
                 scroll_area.show(ui, |ui| {
-                    let avail_width = ui.available_width();
                     let line_number_width = if self.show_line_numbers {
                         let line_count = text.lines().count();
                         let digits = line_count.to_string().len();
@@ -367,28 +370,66 @@ fn main() {
                     } else {
                         0.0
                     };
-
-                    let text_width = avail_width - line_number_width;
-
-                    if self.show_line_numbers {
-                        self.render_line_numbers(ui, &text, line_height, line_number_width);
+                    let font_id = egui::FontId::monospace(self.font_size);
+                    let theme = self.gui_ctx.style_system.get_active_theme().clone();
+                    let mut y = TOP_PADDING;
+                    for (line_num, line) in text.lines().enumerate() {
+                        let mut x = LEFT_PADDING;
+                        // Draw line number
+                        if self.show_line_numbers {
+                            let line_text = format!("{:>4}", line_num + 1);
+                            let baseline_adjust = line_height * 0.2;
+                            let pos = egui::pos2(x, y + baseline_adjust);
+                            ui.painter().text(
+                                pos,
+                                egui::Align2::LEFT_TOP,
+                                line_text,
+                                font_id.clone(),
+                                theme.line_numbers,
+                            );
+                            x += line_number_width;
+                        }
+                        // Draw text
+                        let color = if line.trim_start().starts_with("//") {
+                            egui::Color32::from_rgb(128, 128, 128)
+                        } else if line.contains("fn ") || line.contains("let ") {
+                            egui::Color32::from_rgb(198, 120, 221)
+                        } else {
+                            theme.foreground
+                        };
+                        let pos = egui::pos2(x, y);
+                        ui.painter().text(
+                            pos,
+                            egui::Align2::LEFT_TOP,
+                            line,
+                            font_id.clone(),
+                            color,
+                        );
+                        y += line_height;
                     }
-                    // Use allocate_ui_with_layout instead of deprecated allocate_ui_at_rect
-                    let rect = egui::Rect::from_min_size(
-                        egui::pos2(line_number_width, 0.0),
-                        egui::vec2(text_width, ui.available_height()),
-                    );
-                    let layout = egui::Layout::top_down(egui::Align::Min);
-                    ui.allocate_ui_with_layout(rect.size(), layout, |ui| {
-                        self.render_text_content(
-                            ui,
-                            &text,
-                            &crsr_state,
-                            line_height,
-                            char_width,
-                            &mut response,
-                        )
+                    // Render selection and cursor after text, with x offset for line numbers
+                    // (moved after the loop to avoid borrow checker issues)
+                    let selection = crsr_state.selection().unwrap_or_else(|| Range {
+                        start: Position { line: 0, column: 0 },
+                        end: Position { line: 0, column: 0 },
                     });
+                    self.render_selection(
+                        ui,
+                        &text,
+                        selection,
+                        line_height,
+                        char_width,
+                        &theme,
+                        line_number_width,
+                    );
+                    self.render_cursor(
+                        ui,
+                        &crsr_state,
+                        line_height,
+                        char_width,
+                        &theme,
+                        line_number_width,
+                    );
                 });
                 self.handle_input(ui, &mut response);
                 Some(response)
@@ -404,10 +445,12 @@ fn main() {
                 let theme = self.gui_ctx.style_system.get_active_theme();
                 let font_id = egui::FontId::monospace(self.font_size);
 
-                let mut y = 0.0;
+                let mut y = TOP_PADDING;
                 for (line_num, _) in text.lines().enumerate() {
                     let line_text = format!("{:>4}", line_num + 1);
-                    let pos = egui::pos2(0.0, y);
+                    // Adjust baseline so numbers are vertically centered with text
+                    let baseline_adjust = line_height * 0.2;
+                    let pos = egui::pos2(LEFT_PADDING, y + baseline_adjust);
                     ui.painter().text(
                         pos,
                         egui::Align2::LEFT_TOP,
@@ -418,10 +461,10 @@ fn main() {
                     y += line_height;
                 }
 
-                let sep_x = width - (self.font_size * 0.5);
+                let sep_x = width - (self.font_size * 0.5) + LEFT_PADDING;
                 ui.painter().line_segment(
                     [
-                        egui::pos2(sep_x, 0.0),
+                        egui::pos2(sep_x, TOP_PADDING),
                         egui::pos2(sep_x, ui.available_height()),
                     ],
                     egui::Stroke::new(1.0, theme.line_numbers),
@@ -437,11 +480,16 @@ fn main() {
                 char_width: f32,
                 _response: &mut editor::Response,
             ) {
-                // Avoid immutable borrow of self while using mutable methods later
-                let theme = {
-                    // Take a reference to the theme only, not to self
-                    self.gui_ctx.style_system.get_active_theme().clone()
+                // Calculate line_number_width here for use in selection/cursor rendering
+                let line_number_width = if self.show_line_numbers {
+                    let line_count = text.lines().count();
+                    let digits = line_count.to_string().len();
+                    (digits as f32 * char_width) + (char_width * 2.0)
+                } else {
+                    0.0
                 };
+                // Clone theme before any mutable borrow of self
+                let theme = self.gui_ctx.style_system.get_active_theme().clone();
                 let font_id = egui::FontId::monospace(self.font_size);
 
                 // Render background
@@ -453,13 +501,21 @@ fn main() {
 
                 // Render selection
                 if let Some(selection) = cursor_state.selection() {
-                    self.render_selection(ui, text, selection, line_height, char_width, &theme);
+                    self.render_selection(
+                        ui,
+                        text,
+                        selection,
+                        line_height,
+                        char_width,
+                        &theme,
+                        line_number_width,
+                    );
                 }
 
                 // Render text
-                let mut y = 0.0;
+                let mut y = TOP_PADDING;
                 for (_line_num, line) in text.lines().enumerate() {
-                    let pos = egui::pos2(0.0, y);
+                    let pos = egui::pos2(LEFT_PADDING, y);
 
                     // Simple syntax highlighting (can be expanded)
                     let color = if line.trim_start().starts_with("//") {
@@ -477,7 +533,7 @@ fn main() {
                 }
 
                 // Render cursor
-                self.render_cursor(ui, cursor_state, line_height, char_width, &theme);
+                self.render_cursor(ui, cursor_state, line_height, char_width, &theme, 0.0);
 
                 // Handle text input
                 if ui.rect_contains_pointer(ui.available_rect_before_wrap()) {
@@ -555,14 +611,17 @@ fn main() {
                 line_height: f32,
                 char_width: f32,
                 theme: &Theme,
+                line_number_width: f32,
             ) {
                 // Cursor blinking
                 self.cursor_blink_time += ui.input(|i| i.unstable_dt);
                 let cursor_visible = (self.cursor_blink_time * 2.0) % 2.0 < 1.0;
 
                 if cursor_visible {
-                    let cursor_x = cursor_state.position().column as f32 * char_width;
-                    let cursor_y = cursor_state.position().line as f32 * line_height;
+                    let cursor_x = cursor_state.position().column as f32 * char_width
+                        + LEFT_PADDING
+                        + line_number_width;
+                    let cursor_y = cursor_state.position().line as f32 * line_height + TOP_PADDING;
 
                     ui.painter().line_segment(
                         [
@@ -582,15 +641,19 @@ fn main() {
                 line_height: f32,
                 char_width: f32,
                 theme: &Theme,
+                line_number_width: f32,
             ) {
                 // Simple selection rendering - can be optimized
-                let start_y = selection.start.line as f32 * line_height;
-                let end_y = selection.end.line as f32 * line_height;
+                let start_y = selection.start.line as f32 * line_height + TOP_PADDING;
+                let end_y = selection.end.line as f32 * line_height + TOP_PADDING;
 
                 if selection.start.line == selection.end.line {
                     // Single line selection
-                    let start_x = selection.start.column as f32 * char_width;
-                    let end_x = selection.end.column as f32 * char_width;
+                    let start_x = selection.start.column as f32 * char_width
+                        + LEFT_PADDING
+                        + line_number_width;
+                    let end_x =
+                        selection.end.column as f32 * char_width + LEFT_PADDING + line_number_width;
 
                     ui.painter().rect_filled(
                         egui::Rect::from_min_size(
@@ -603,10 +666,10 @@ fn main() {
                 } else {
                     // Multi-line selection (simplified)
                     for line in selection.start.line..=selection.end.line {
-                        let y = line as f32 * line_height;
+                        let y = line as f32 * line_height + TOP_PADDING;
                         ui.painter().rect_filled(
                             egui::Rect::from_min_size(
-                                egui::pos2(0.0, y),
+                                egui::pos2(LEFT_PADDING + line_number_width, y),
                                 egui::vec2(ui.available_width(), line_height),
                             ),
                             egui::Rounding::ZERO,
