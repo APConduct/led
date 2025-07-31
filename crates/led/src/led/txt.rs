@@ -230,9 +230,10 @@ fn main() {
                 text_changed: false,
             };
 
-            // Get buffer text and cursor state up front, clone as needed to avoid borrow issues
+            // Get buffer text up front
             let text = self.edtr_state.get_buffer_text(self.buffer_id)?.to_string();
-            let crsr_state = self.edtr_state.get_cursor_state(self.buffer_id)?.clone();
+            // Get cursor state up front
+            let mut crsr_state = self.edtr_state.get_cursor_state(self.buffer_id)?.clone();
 
             let font_id = egui::FontId::monospace(self.font_size);
             let line_height = ui.fonts(|f| f.row_height(&font_id));
@@ -312,6 +313,14 @@ fn main() {
             for command in &response.commands {
                 let _ = self.edtr_state.execute_command(command.clone());
             }
+            // Always refetch the updated cursor state after executing commands
+            crsr_state = self.edtr_state.get_cursor_state(self.buffer_id)?.clone();
+
+            // Use the refreshed cursor state for rendering selection and cursor
+            // (and for any further input logic if needed)
+            // The following rendering logic uses crsr_state:
+            // (Note: If you use crsr_state elsewhere, update those usages too)
+
             Some(response)
         }
 
@@ -421,7 +430,7 @@ fn main() {
                 for event in &i.events {
                     match event {
                         egui::Event::Text(text) => {
-                            // Insert text at cursor position
+                            // Insert text at refreshed cursor position
                             if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
                                 let buffer =
                                     self.edtr_state.buffers().get(&self.buffer_id).unwrap();
@@ -434,6 +443,15 @@ fn main() {
                                 });
 
                                 response.text_changed = true;
+
+                                // Advance cursor right by one column after insert
+                                let mut new_pos = cursor.position();
+                                new_pos.column += text.chars().count(); // Usually 1, but supports paste
+                                response.commands.push(editor::Command::MoveCursor {
+                                    buffer_id: self.buffer_id,
+                                    position: new_pos,
+                                });
+                                response.cursor_moved = true;
                             }
                         }
 
@@ -494,7 +512,10 @@ fn main() {
                     + LEFT_PADDING
                     + line_number_width
                     + TEXT_LEFT_PADDING;
-                let cursor_y = cursor_state.position().line as f32 * line_height + TOP_PADDING;
+                let cursor_y = cursor_state.position().line as f32 * line_height
+                    + TOP_PADDING
+                    + TEXT_TOP_PADDING
+                    + line_height;
 
                 ui.painter().line_segment(
                     [
