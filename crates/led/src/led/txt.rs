@@ -686,6 +686,28 @@ fn main() {
                                 });
 
                                 response.text_changed = true;
+
+                                // Move cursor left after deletion
+                                let mut new_pos = cursor.position();
+                                if new_pos.column > 0 {
+                                    new_pos.column -= 1;
+                                } else if new_pos.line > 0 {
+                                    new_pos.line -= 1;
+                                    // Move to end of previous line
+                                    if let Some(text) =
+                                        self.edtr_state.get_buffer_text(self.buffer_id)
+                                    {
+                                        let lines: Vec<&str> = text.lines().collect();
+                                        if new_pos.line < lines.len() {
+                                            new_pos.column = lines[new_pos.line].len();
+                                        }
+                                    }
+                                }
+                                response.commands.push(editor::Command::MoveCursor {
+                                    buffer_id: self.buffer_id,
+                                    position: new_pos,
+                                });
+                                response.cursor_moved = true;
                             }
                         }
                     }
@@ -706,6 +728,32 @@ fn main() {
 
                             response.text_changed = true;
                         }
+                    }
+                }
+
+                Key::Tab => {
+                    // Insert tab_size spaces
+                    if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
+                        let buffer = self.edtr_state.buffers().get(&self.buffer_id).unwrap();
+                        let offset = buffer.position_to_offset(cursor.position());
+
+                        let tab_str = " ".repeat(self.tab_size);
+                        response.commands.push(editor::Command::InsertText {
+                            buffer_id: self.buffer_id,
+                            offset,
+                            text: tab_str.clone(),
+                        });
+
+                        response.text_changed = true;
+
+                        // Advance cursor by tab_size columns
+                        let mut new_pos = cursor.position();
+                        new_pos.column += self.tab_size;
+                        response.commands.push(editor::Command::MoveCursor {
+                            buffer_id: self.buffer_id,
+                            position: new_pos,
+                        });
+                        response.cursor_moved = true;
                     }
                 }
 
