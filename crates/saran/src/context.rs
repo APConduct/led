@@ -10,9 +10,9 @@ pub struct Context {
     /// The egui context for UI rendering and state management.
     pub egui_ctx: egui::Context,
     /// The style system for managing UI styles and themes.
-    style_system: super::style::System,
+    pub style_system: super::style::System,
     /// The layout cache for optimizing layout calculations.
-    layout_cache: super::layout::Cache,
+    pub layout_cache: super::layout::Cache,
 }
 
 impl Context {

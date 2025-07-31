@@ -43,46 +43,46 @@ pub mod lua {
 
         pub fn load_default_config(&mut self) -> AnyResult<()> {
             let config_script = r##"
-        -- Default KUP Editor Configuration
+-- Default KUP Editor Configuration
 
-        -- Key bindings
-        kup = {}
-        kup.keybindings = {}
+-- Key bindings
+kup = {}
+kup.keybindings = {}
 
-        function kup.bind_key(key, action)
-            kup.keybindings[key] = action
-        end
+function kup.bind_key(key, action)
+    kup.keybindings[key] = action
+end
 
-        -- Example keybindings
-        kup.bind_key("ctrl+s", function()
-            -- Save file
-            return { type = "SaveBuffer", buffer_id = kup.current_buffer }
-        end)
+-- Example keybindings
+kup.bind_key("ctrl+s", function()
+    -- Save file
+    return { type = "SaveBuffer", buffer_id = kup.current_buffer }
+end)
 
-        kup.bind_key("ctrl+o", function()
-            -- Open file
-            return { type = "OpenFile" }
-        end)
+kup.bind_key("ctrl+o", function()
+    -- Open file
+    return { type = "OpenFile" }
+end)
 
-        -- Theme configuration
-        kup.theme = {
-            background = "#282c34",
-            foreground = "#abb2bf",
-            cursor = "#ffffff",
-            selection = "#3d85c6",
-            line_numbers = "#808080"
-        }
+-- Theme configuration
+kup.theme = {
+    background = "#282c34",
+    foreground = "#abb2bf",
+    cursor = "#ffffff",
+    selection = "#3d85c6",
+    line_numbers = "#808080"
+}
 
-        -- Editor settings
-        kup.settings = {
-            tab_size = 4,
-            show_line_numbers = true,
-            font_size = 14,
-            auto_save = true
-        }
+-- Editor settings
+kup.settings = {
+    tab_size = 4,
+    show_line_numbers = true,
+    font_size = 14,
+    auto_save = true
+}
 
-        print("KUP Editor configuration loaded")
-        "##;
+print("KUP Editor configuration loaded")
+"##;
 
             self.lua.load(config_script).exec()?;
             Ok(())
@@ -99,14 +99,14 @@ pub mod lua {
         pub fn execute_keybinding(&mut self, key: &str) -> AnyResult<()> {
             let script = format!(
                 r#"
-                        if kup.keybindings["{}"] then
-                            local result = kup.keybindings["{}"]()
-                            if result then
-                                return result
-                            end
-                        end
-                        return nil
-                        "#,
+if kup.keybindings["{}"] then
+    local result = kup.keybindings["{}"]()
+    if result then
+        return result
+    end
+end
+return nil
+"#,
                 key, key
             );
 
@@ -125,7 +125,12 @@ pub mod txt {
     pub mod edtr {
         use super::super::lua::Runtime;
         use egui::{Context as EguiContext, Rect, Ui};
-        use led::led::{buffer::editor::State, commands::editor::Response, types::Range};
+        use led::led::{
+            buffer::editor::State,
+            commands::editor::{self, Response},
+            cursor,
+            types::{Position, Range},
+        };
         use saran::{context::Context as GuiContext, theme::Theme};
 
         pub struct App {
@@ -155,12 +160,13 @@ pub mod txt {
                     last_frame_time: std::time::Instant::now(),
                 };
 
-                let content = r#"// Welcome to LED!!!!
-                // The Editor 4U!!!!
-                fn main() {
-                    println!("Hello, world!");
-                }
-                "#
+                let content = r#"
+// Welcome to LED!!!!
+// The Editor 4U!!!!
+fn main() {
+    println!("Hello, world!");
+}
+"#
                 .to_string();
 
                 app.edtr_state.create_buffer(content);
@@ -230,8 +236,6 @@ pub mod txt {
                         }
                     }
                 }
-
-                todo!("Implement the editor UI rendering logic here");
             }
 
             fn render_status_bar(&self, ui: &mut egui::Ui) {
@@ -347,8 +351,9 @@ pub mod txt {
                     text_changed: false,
                 };
 
-                let text = self.edtr_state.get_buffer_text(self.buffer_id)?;
-                let crsr_state = self.edtr_state.get_cursor_state(self.buffer_id)?;
+                // Get buffer text and cursor state up front, clone as needed to avoid borrow issues
+                let text = self.edtr_state.get_buffer_text(self.buffer_id)?.to_string();
+                let crsr_state = self.edtr_state.get_cursor_state(self.buffer_id)?.clone();
 
                 let font_id = egui::FontId::monospace(self.font_size);
                 let line_height = ui.fonts(|f| f.row_height(&font_id));
@@ -359,41 +364,40 @@ pub mod txt {
                     .stick_to_right(false)
                     .stick_to_bottom(false);
 
-                // let scroll_response = scroll_area.show(ui, |ui| {
-                //     let avail_width = ui.available_width();
-                //     let line_number_width = if self.show_line_numbers {
-                //         let line_count = text.lines().count();
-                //         let digits = line_count.to_string().len();
-                //         (digits as f32 * char_width) + (char_width * 2.0)
-                //     } else {
-                //         0.0
-                //     };
+                scroll_area.show(ui, |ui| {
+                    let avail_width = ui.available_width();
+                    let line_number_width = if self.show_line_numbers {
+                        let line_count = text.lines().count();
+                        let digits = line_count.to_string().len();
+                        (digits as f32 * char_width) + (char_width * 2.0)
+                    } else {
+                        0.0
+                    };
 
-                //     let text_width = avail_width - line_number_width;
+                    let text_width = avail_width - line_number_width;
 
-                //     if self.show_line_numbers {
-                //         self.render_line_numbers(ui, &text, line_height, line_number_width);
-                //     }
-                //     ui.allocate_ui_at_rect(
-                //         egui::Rect::from_min_size(
-                //             egui::pos2(line_number_width, 0.0),
-                //             egui::vec2(text_width, ui.available_height()),
-                //         ),
-                //         |ui| {
-                //             self.render_text_content(
-                //                 ui,
-                //                 &text,
-                //                 crsr_state,
-                //                 line_height,
-                //                 char_width,
-                //                 &mut response,
-                //             )
-                //         },
-                //     );
-                // });
-                // self.handle_input(ui, &mut response);
-                // Some(response)
-                todo!("Implement the editor rendering logic here");
+                    if self.show_line_numbers {
+                        self.render_line_numbers(ui, &text, line_height, line_number_width);
+                    }
+                    // Use allocate_ui_with_layout instead of deprecated allocate_ui_at_rect
+                    let rect = egui::Rect::from_min_size(
+                        egui::pos2(line_number_width, 0.0),
+                        egui::vec2(text_width, ui.available_height()),
+                    );
+                    let layout = egui::Layout::top_down(egui::Align::Min);
+                    ui.allocate_ui_with_layout(rect.size(), layout, |ui| {
+                        self.render_text_content(
+                            ui,
+                            &text,
+                            &crsr_state,
+                            line_height,
+                            char_width,
+                            &mut response,
+                        )
+                    });
+                });
+                self.handle_input(ui, &mut response);
+                Some(response)
             }
 
             fn render_line_numbers(
@@ -403,38 +407,177 @@ pub mod txt {
                 line_height: f32,
                 width: f32,
             ) {
-                todo!("Implement line number rendering");
+                let theme = self.gui_ctx.style_system.get_active_theme();
+                let font_id = egui::FontId::monospace(self.font_size);
+
+                let mut y = 0.0;
+                for (line_num, _) in text.lines().enumerate() {
+                    let line_text = format!("{:>4}", line_num + 1);
+                    let pos = egui::pos2(0.0, y);
+                    ui.painter().text(
+                        pos,
+                        egui::Align2::LEFT_TOP,
+                        line_text,
+                        font_id.clone(),
+                        theme.line_numbers,
+                    );
+                    y += line_height;
+                }
+
+                let sep_x = width - (self.font_size * 0.5);
+                ui.painter().line_segment(
+                    [
+                        egui::pos2(sep_x, 0.0),
+                        egui::pos2(sep_x, ui.available_height()),
+                    ],
+                    egui::Stroke::new(1.0, theme.line_numbers),
+                );
             }
 
             fn render_text_content(
                 &mut self,
                 ui: &mut egui::Ui,
                 text: &str,
-                crsr_state: &led::led::cursor::State,
+                cursor_state: &cursor::State,
                 line_height: f32,
                 char_width: f32,
-                response: &mut led::led::commands::editor::Response,
+                _response: &mut editor::Response,
             ) {
-                todo!("Implement text content rendering");
+                // Avoid immutable borrow of self while using mutable methods later
+                let theme = {
+                    // Take a reference to the theme only, not to self
+                    self.gui_ctx.style_system.get_active_theme().clone()
+                };
+                let font_id = egui::FontId::monospace(self.font_size);
+
+                // Render background
+                ui.painter().rect_filled(
+                    ui.available_rect_before_wrap(),
+                    egui::Rounding::ZERO,
+                    theme.background,
+                );
+
+                // Render selection
+                if let Some(selection) = cursor_state.selection() {
+                    self.render_selection(ui, text, selection, line_height, char_width, &theme);
+                }
+
+                // Render text
+                let mut y = 0.0;
+                for (_line_num, line) in text.lines().enumerate() {
+                    let pos = egui::pos2(0.0, y);
+
+                    // Simple syntax highlighting (can be expanded)
+                    let color = if line.trim_start().starts_with("//") {
+                        egui::Color32::from_rgb(128, 128, 128) // Comments
+                    } else if line.contains("fn ") || line.contains("let ") {
+                        egui::Color32::from_rgb(198, 120, 221) // Keywords
+                    } else {
+                        theme.foreground
+                    };
+
+                    ui.painter()
+                        .text(pos, egui::Align2::LEFT_TOP, line, font_id.clone(), color);
+
+                    y += line_height;
+                }
+
+                // Render cursor
+                self.render_cursor(ui, cursor_state, line_height, char_width, &theme);
+
+                // Handle text input
+                if ui.rect_contains_pointer(ui.available_rect_before_wrap()) {
+                    ui.memory_mut(|mem| mem.request_focus(ui.next_auto_id()));
+                }
             }
 
-            fn handle_input(
-                &mut self,
-                ui: &mut egui::Ui,
-                response: &mut led::led::commands::editor::Response,
-            ) {
-                todo!("Implement input handling");
+            fn handle_input(&mut self, ui: &mut egui::Ui, response: &mut editor::Response) {
+                // Handle keyboard input
+                ui.input(|i| {
+                    for event in &i.events {
+                        match event {
+                            egui::Event::Text(text) => {
+                                // Insert text at cursor position
+                                if let Some(cursor) =
+                                    self.edtr_state.get_cursor_state(self.buffer_id)
+                                {
+                                    let buffer =
+                                        self.edtr_state.buffers().get(&self.buffer_id).unwrap();
+                                    let offset = buffer.position_to_offset(cursor.position());
+
+                                    response.commands.push(editor::Command::InsertText {
+                                        buffer_id: self.buffer_id,
+                                        offset,
+                                        text: text.clone(),
+                                    });
+
+                                    response.text_changed = true;
+                                }
+                            }
+
+                            egui::Event::Key {
+                                key,
+                                pressed: true,
+                                modifiers,
+                                ..
+                            } => {
+                                self.handle_key_event(*key, *modifiers, response);
+                            }
+
+                            _ => {}
+                        }
+                    }
+                });
+
+                // Handle mouse input
+                if ui.rect_contains_pointer(ui.available_rect_before_wrap()) {
+                    if ui.input(|i| i.pointer.primary_clicked()) {
+                        if let Some(pos) = ui.input(|i| i.pointer.interact_pos()) {
+                            // Convert mouse position to text position
+                            let line_height = ui
+                                .fonts(|f| f.row_height(&egui::FontId::monospace(self.font_size)));
+                            let char_width = ui.fonts(|f| {
+                                f.glyph_width(&egui::FontId::monospace(self.font_size), ' ')
+                            });
+
+                            let line = (pos.y / line_height) as usize;
+                            let column = (pos.x / char_width) as usize;
+
+                            response.commands.push(editor::Command::MoveCursor {
+                                buffer_id: self.buffer_id,
+                                position: Position { line, column },
+                            });
+
+                            response.cursor_moved = true;
+                        }
+                    }
+                }
             }
 
             fn render_cursor(
                 &mut self,
                 ui: &mut egui::Ui,
-                cursor_state: &State,
+                cursor_state: &cursor::State,
                 line_height: f32,
                 char_width: f32,
                 theme: &Theme,
             ) {
-                todo!("Implement cursor rendering");
+                // Cursor blinking
+                self.cursor_blink_time += ui.input(|i| i.unstable_dt);
+                let cursor_visible = (self.cursor_blink_time * 2.0) % 2.0 < 1.0;
+
+                if cursor_visible {
+                    let cursor_x = cursor_state.position().column as f32 * char_width;
+                    let cursor_y = cursor_state.position().line as f32 * line_height;
+
+                    ui.painter().line_segment(
+                        [
+                            egui::pos2(cursor_x, cursor_y),
+                            egui::pos2(cursor_x, cursor_y + line_height),
+                        ],
+                        egui::Stroke::new(2.0, theme.cursor),
+                    );
+                }
             }
 
             fn render_selection(
@@ -446,16 +589,196 @@ pub mod txt {
                 char_width: f32,
                 theme: &Theme,
             ) {
-                todo!("Implement selection rendering");
+                // Simple selection rendering - can be optimized
+                let start_y = selection.start.line as f32 * line_height;
+                let end_y = selection.end.line as f32 * line_height;
+
+                if selection.start.line == selection.end.line {
+                    // Single line selection
+                    let start_x = selection.start.column as f32 * char_width;
+                    let end_x = selection.end.column as f32 * char_width;
+
+                    ui.painter().rect_filled(
+                        egui::Rect::from_min_size(
+                            egui::pos2(start_x, start_y),
+                            egui::vec2(end_x - start_x, line_height),
+                        ),
+                        egui::Rounding::ZERO,
+                        theme.selection,
+                    );
+                } else {
+                    // Multi-line selection (simplified)
+                    for line in selection.start.line..=selection.end.line {
+                        let y = line as f32 * line_height;
+                        ui.painter().rect_filled(
+                            egui::Rect::from_min_size(
+                                egui::pos2(0.0, y),
+                                egui::vec2(ui.available_width(), line_height),
+                            ),
+                            egui::Rounding::ZERO,
+                            theme.selection,
+                        );
+                    }
+                }
             }
 
             fn handle_key_event(
                 &mut self,
                 key: egui::Key,
                 modifiers: egui::Modifiers,
-                response: &mut Response,
+                response: &mut editor::Response,
             ) {
-                todo!("Implement key input handling");
+                use egui::Key;
+
+                match key {
+                    Key::ArrowLeft => {
+                        // Move cursor left
+                        if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
+                            let mut new_pos = cursor.position();
+                            if new_pos.column > 0 {
+                                new_pos.column -= 1;
+                            } else if new_pos.line > 0 {
+                                new_pos.line -= 1;
+                                // Move to end of previous line
+                                if let Some(text) = self.edtr_state.get_buffer_text(self.buffer_id)
+                                {
+                                    let lines: Vec<&str> = text.lines().collect();
+                                    if new_pos.line < lines.len() {
+                                        new_pos.column = lines[new_pos.line].len();
+                                    }
+                                }
+                            }
+
+                            response.commands.push(editor::Command::MoveCursor {
+                                buffer_id: self.buffer_id,
+                                position: new_pos,
+                            });
+
+                            response.cursor_moved = true;
+                        }
+                    }
+
+                    Key::ArrowRight => {
+                        // Move cursor right
+                        if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
+                            let mut new_pos = cursor.position();
+
+                            if let Some(text) = self.edtr_state.get_buffer_text(self.buffer_id) {
+                                let lines: Vec<&str> = text.lines().collect();
+                                if new_pos.line < lines.len() {
+                                    let current_line = lines[new_pos.line];
+                                    if new_pos.column < current_line.len() {
+                                        new_pos.column += 1;
+                                    } else if new_pos.line + 1 < lines.len() {
+                                        new_pos.line += 1;
+                                        new_pos.column = 0;
+                                    }
+                                }
+                            }
+
+                            response.commands.push(editor::Command::MoveCursor {
+                                buffer_id: self.buffer_id,
+                                position: new_pos,
+                            });
+
+                            response.cursor_moved = true;
+                        }
+                    }
+
+                    Key::ArrowUp => {
+                        // Move cursor up
+                        if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
+                            let mut new_pos = cursor.position();
+                            if new_pos.line > 0 {
+                                new_pos.line -= 1;
+                            }
+
+                            response.commands.push(editor::Command::MoveCursor {
+                                buffer_id: self.buffer_id,
+                                position: new_pos,
+                            });
+
+                            response.cursor_moved = true;
+                        }
+                    }
+
+                    Key::ArrowDown => {
+                        // Move cursor down
+                        if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
+                            let mut new_pos = cursor.position();
+                            if let Some(text) = self.edtr_state.get_buffer_text(self.buffer_id) {
+                                let line_count = text.lines().count();
+                                if new_pos.line + 1 < line_count {
+                                    new_pos.line += 1;
+                                }
+                            }
+
+                            response.commands.push(editor::Command::MoveCursor {
+                                buffer_id: self.buffer_id,
+                                position: new_pos,
+                            });
+
+                            response.cursor_moved = true;
+                        }
+                    }
+
+                    Key::Backspace => {
+                        // Delete character before cursor
+                        if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
+                            if cursor.position().column > 0 || cursor.position().line > 0 {
+                                let buffer =
+                                    self.edtr_state.buffers().get(&self.buffer_id).unwrap();
+                                let offset = buffer.position_to_offset(cursor.position());
+
+                                if offset > 0 {
+                                    response.commands.push(editor::Command::DeleteText {
+                                        buffer_id: self.buffer_id,
+                                        start: offset - 1,
+                                        length: 1,
+                                    });
+
+                                    response.text_changed = true;
+                                }
+                            }
+                        }
+                    }
+
+                    Key::Delete => {
+                        // Delete character after cursor
+                        if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
+                            let buffer = self.edtr_state.buffers().get(&self.buffer_id).unwrap();
+                            let offset = buffer.position_to_offset(cursor.position());
+
+                            if offset < buffer.len() {
+                                response.commands.push(editor::Command::DeleteText {
+                                    buffer_id: self.buffer_id,
+                                    start: offset,
+                                    length: 1,
+                                });
+
+                                response.text_changed = true;
+                            }
+                        }
+                    }
+
+                    Key::Enter => {
+                        // Insert newline
+                        if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
+                            let buffer = self.edtr_state.buffers().get(&self.buffer_id).unwrap();
+                            let offset = buffer.position_to_offset(cursor.position());
+
+                            response.commands.push(editor::Command::InsertText {
+                                buffer_id: self.buffer_id,
+                                offset,
+                                text: "\n".to_string(),
+                            });
+
+                            response.text_changed = true;
+                        }
+                    }
+
+                    _ => {}
+                }
             }
         }
     }

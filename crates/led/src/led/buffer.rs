@@ -55,6 +55,10 @@ pub mod editor {
             }
         }
 
+        pub fn buffers(&self) -> &HashMap<super::ID, super::super::piece::Table> {
+            &self.buffers
+        }
+
         /// Creates a new buffer with the given content and initializes its metadata, cursor, and undo/redo stacks.
         ///
         /// # Arguments
