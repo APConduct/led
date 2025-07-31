@@ -293,9 +293,10 @@ fn main() {
             let max_line_length = text.lines().map(|l| l.len()).max().unwrap_or(0);
 
             // Calculate content size for scrolling
+            // Fixed gutter width for up to 99,999 lines (5 digits)
+            let max_digits = 5;
             let line_number_width = if self.show_line_numbers {
-                let digits = line_count.to_string().len();
-                (digits as f32 * char_width) + (char_width * 2.0)
+                (max_digits as f32 * char_width) + (char_width * 2.0)
             } else {
                 0.0
             };
@@ -337,11 +338,16 @@ fn main() {
                     for (line_num, line) in text.lines().enumerate() {
                         let mut x = origin.x + LEFT_PADDING;
                         if self.show_line_numbers {
-                            let line_text = format!("{:>4}", line_num + 1);
-                            let pos = egui::pos2(origin.x + LEFT_PADDING, y);
+                            // Pad line numbers to 5 digits, right-aligned
+                            let line_text = format!("{:>width$}", line_num + 1, width = max_digits);
+                            // The right edge of the gutter:
+                            let gutter_right_x =
+                                origin.x + LEFT_PADDING + line_number_width - char_width;
+                            // Paint the line number so its right edge is at gutter_right_x
+                            let pos = egui::pos2(gutter_right_x, y);
                             ui.painter().text(
                                 pos,
-                                egui::Align2::LEFT_TOP,
+                                egui::Align2::RIGHT_TOP,
                                 line_text,
                                 font_id.clone(),
                                 theme.line_numbers,
