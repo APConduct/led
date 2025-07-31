@@ -34,12 +34,13 @@ pub mod piece {
         pub line_breaks: u32,
     }
 
-    use crate::led::util::count_line_breaks;
     use crate::led::types::source::ID;
+    use crate::led::util::count_line_breaks;
     use std::cmp::PartialEq;
     use std::collections::BTreeMap;
 
     /// Piece table data structure for efficient text editing.
+    #[derive(Debug, Clone)]
     pub struct Table {
         /// The original buffer (read-only).
         original: String,
@@ -442,7 +443,9 @@ pub mod piece {
             let offset_in_piece_start = start - piece_start_offset;
             let offset_in_piece_end = end - piece_start_offset;
 
-            if offset_in_piece_start >= self.pieces[piece_idx].length || offset_in_piece_end > self.pieces[piece_idx].length {
+            if offset_in_piece_start >= self.pieces[piece_idx].length
+                || offset_in_piece_end > self.pieces[piece_idx].length
+            {
                 return Err(anyhow::anyhow!("Delete range out of bounds for the piece"));
             }
 
@@ -480,7 +483,8 @@ pub mod piece {
                         &match piece.source {
                             ID::Original => &self.original,
                             ID::Add => &self.add_buffer,
-                        }[piece.start + offset_in_piece_end..piece.start + piece.length].to_string(),
+                        }[piece.start + offset_in_piece_end..piece.start + piece.length]
+                            .to_string(),
                     ),
                 };
                 piece.length = offset_in_piece_start;
@@ -488,7 +492,8 @@ pub mod piece {
                     &match piece.source {
                         ID::Original => &self.original,
                         ID::Add => &self.add_buffer,
-                    }[piece.start..piece.start + offset_in_piece_start].to_string(),
+                    }[piece.start..piece.start + offset_in_piece_start]
+                        .to_string(),
                 );
                 self.pieces.insert(piece_idx + 1, right_piece);
             }
@@ -767,7 +772,10 @@ mod tests {
     #[test]
     fn position_to_offset_past_end_returns_total_length() {
         let table = Table::new("abc\ndef".to_string());
-        let offset = table.position_to_offset(super::super::types::Position { line: 10, column: 10 });
+        let offset = table.position_to_offset(super::super::types::Position {
+            line: 10,
+            column: 10,
+        });
         assert_eq!(offset, table.len());
     }
 

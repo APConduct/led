@@ -1,5 +1,5 @@
 pub mod buffer;
-mod commands;
+pub mod commands;
 pub mod cursor;
 pub mod piece_table;
 

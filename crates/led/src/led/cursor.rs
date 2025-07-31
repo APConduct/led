@@ -2,6 +2,7 @@ use crate::led::types::{Position, Range};
 
 /// Represents the state of a cursor in the editor, including its position,
 /// optional selection range, and the buffer it belongs to.
+#[derive(Debug, Clone)]
 pub struct State {
     /// The current position of the cursor.
     pub(crate) position: Position,
@@ -46,8 +47,8 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::led::types::{Position, Range};
     use crate::led::buffer;
+    use crate::led::types::{Position, Range};
     use uuid::Uuid;
 
     #[test]
@@ -98,11 +99,7 @@ mod tests {
     #[test]
     fn buffer_id_returns_correct_id() {
         let buffer_id = buffer::ID(Uuid::new_v4());
-        let state = State::new(
-            Position { line: 2, column: 2 },
-            None,
-            buffer_id,
-        );
+        let state = State::new(Position { line: 2, column: 2 }, None, buffer_id);
         assert_eq!(state.buffer_id(), buffer_id);
     }
 }

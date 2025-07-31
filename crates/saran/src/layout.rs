@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use crate::theme::Theme;
 use crate::size::Size;
+use crate::theme::Theme;
+use std::collections::HashMap;
 
 pub type ScreenSize = Size<f32>;
 
@@ -12,6 +12,7 @@ pub type ScreenSize = Size<f32>;
 ///   to avoid redundant layout computations for the same text.
 /// - `glyph_cache`: Caches `egui::epaint::text::FontId` objects keyed by character,
 ///   to speed up font resolution for glyphs.
+#[derive(Debug, Clone)]
 pub struct Cache {
     /// Stores cached text layouts for strings.
     text_layouts: HashMap<String, egui::text::LayoutJob>,
@@ -65,7 +66,11 @@ impl<'a> Context<'a> {
     ///
     /// # Returns
     /// A new `Context` instance initialized with the provided parameters.
-    pub fn new(available_space: ScreenSize, direction: Direction, theme: Option<&'a Theme>) -> Self {
+    pub fn new(
+        available_space: ScreenSize,
+        direction: Direction,
+        theme: Option<&'a Theme>,
+    ) -> Self {
         Self {
             available_space,
             direction,
@@ -78,8 +83,8 @@ impl<'a> Context<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::style::System;
     use crate::size::Size;
+    use crate::style::System;
     #[test]
     fn creates_empty_cache() {
         let cache = Cache::new();
@@ -110,7 +115,7 @@ mod tests {
 
     #[test]
     fn context_handles_zero_available_space() {
-        let available_space = Size::new( 0.0,  0.0 );
+        let available_space = Size::new(0.0, 0.0);
         let ctx = Context::new(available_space, Direction::Horizontal, None);
         assert_eq!(ctx.available_space.width(), 0.0);
         assert_eq!(ctx.available_space.height(), 0.0);

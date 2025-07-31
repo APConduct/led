@@ -5,6 +5,7 @@
 /// - `egui_ctx`: The main egui context used for rendering and UI state.
 /// - `style_system`: Manages the application's style and theming.
 /// - `layout_cache`: Caches layout computations for efficient UI rendering.
+#[derive(Debug, Clone)]
 pub struct Context {
     /// The egui context for UI rendering and state management.
     pub egui_ctx: egui::Context,

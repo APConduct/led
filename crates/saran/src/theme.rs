@@ -7,6 +7,7 @@
 /// - `selection`: The color used for selected text or elements.
 /// - `cursor`: The color of the text cursor.
 /// - `line_numbers`: The color used for line numbers in the UI.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Theme {
     /// The background color of the UI.
     pub background: egui::Color32,
