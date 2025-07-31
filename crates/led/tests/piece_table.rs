@@ -1,5 +1,5 @@
-use led::led::piece_table::piece::Table;
-use led::led::types::Position;
+use led::piece_table::piece::Table;
+use led::types::Position;
 
 fn make_table_with_text(text: &str) -> Table {
     let mut table = Table::new("".to_string());
