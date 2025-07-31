@@ -258,6 +258,7 @@ fn main() {
             edtr_state: &'a mut led::buffer::editor::State,
             gui_ctx: &'a mut saran::context::Context,
         ) -> Self {
+            println!("[DEBUG] Widget::new called");
             Self {
                 buffer_id,
                 edtr_state,
@@ -552,6 +553,7 @@ fn main() {
                 for event in &i.events {
                     match event {
                         egui::Event::Text(text) => {
+                            // Insert text at refreshed cursor position
                             if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
                                 let buffer =
                                     self.edtr_state.buffers().get(&self.buffer_id).unwrap();
@@ -565,13 +567,21 @@ fn main() {
 
                                 response.text_changed = true;
 
+                                // Advance cursor right by one column after insert
                                 let mut new_pos = cursor.position();
-                                new_pos.column += text.chars().count();
+                                new_pos.column += text.chars().count(); // Usually 1, but supports paste
                                 response.commands.push(editor::Command::MoveCursor {
                                     buffer_id: self.buffer_id,
                                     position: new_pos,
                                 });
                                 response.cursor_moved = true;
+
+                                // Reset preferred_column on text input
+                                if let Some(cursor_mut) =
+                                    self.edtr_state.cursors.get_mut(&self.buffer_id)
+                                {
+                                    cursor_mut.preferred_column = None;
+                                }
                             }
                         }
                         egui::Event::Key {
@@ -703,20 +713,24 @@ fn main() {
             match key {
                 Key::ArrowLeft => {
                     // Move cursor left
-                    if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
-                        let mut new_pos = cursor.position();
+                    let text = self
+                        .edtr_state
+                        .get_buffer_text(self.buffer_id)
+                        .unwrap_or_default();
+                    let lines: Vec<&str> = text.lines().collect();
+                    if let Some(cursor) = self.edtr_state.cursors.get_mut(&self.buffer_id) {
+                        let mut new_pos = cursor.position;
                         if new_pos.column > 0 {
                             new_pos.column -= 1;
                         } else if new_pos.line > 0 {
                             new_pos.line -= 1;
                             // Move to end of previous line
-                            if let Some(text) = self.edtr_state.get_buffer_text(self.buffer_id) {
-                                let lines: Vec<&str> = text.lines().collect();
-                                if new_pos.line < lines.len() {
-                                    new_pos.column = lines[new_pos.line].len();
-                                }
+                            if new_pos.line < lines.len() {
+                                new_pos.column = lines[new_pos.line].len();
                             }
                         }
+                        // Reset preferred column on horizontal movement
+                        cursor.preferred_column = None;
 
                         response.commands.push(editor::Command::MoveCursor {
                             buffer_id: self.buffer_id,
@@ -729,21 +743,25 @@ fn main() {
 
                 Key::ArrowRight => {
                     // Move cursor right
-                    if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
-                        let mut new_pos = cursor.position();
+                    let text = self
+                        .edtr_state
+                        .get_buffer_text(self.buffer_id)
+                        .unwrap_or_default();
+                    let lines: Vec<&str> = text.lines().collect();
+                    if let Some(cursor) = self.edtr_state.cursors.get_mut(&self.buffer_id) {
+                        let mut new_pos = cursor.position;
 
-                        if let Some(text) = self.edtr_state.get_buffer_text(self.buffer_id) {
-                            let lines: Vec<&str> = text.lines().collect();
-                            if new_pos.line < lines.len() {
-                                let current_line = lines[new_pos.line];
-                                if new_pos.column < current_line.len() {
-                                    new_pos.column += 1;
-                                } else if new_pos.line + 1 < lines.len() {
-                                    new_pos.line += 1;
-                                    new_pos.column = 0;
-                                }
+                        if new_pos.line < lines.len() {
+                            let current_line = lines[new_pos.line];
+                            if new_pos.column < current_line.len() {
+                                new_pos.column += 1;
+                            } else if new_pos.line + 1 < lines.len() {
+                                new_pos.line += 1;
+                                new_pos.column = 0;
                             }
                         }
+                        // Reset preferred column on horizontal movement
+                        cursor.preferred_column = None;
 
                         response.commands.push(editor::Command::MoveCursor {
                             buffer_id: self.buffer_id,
@@ -755,13 +773,50 @@ fn main() {
                 }
 
                 Key::ArrowUp => {
-                    // Move cursor up
-                    if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
-                        let mut new_pos = cursor.position();
+                    // Move cursor up with preferred column logic
+                    let text = self
+                        .edtr_state
+                        .get_buffer_text(self.buffer_id)
+                        .unwrap_or_default();
+                    let lines: Vec<&str> = text.lines().collect();
+                    if let Some(cursor) = self.edtr_state.cursors.get_mut(&self.buffer_id) {
+                        let mut new_pos = cursor.position;
+
+                        // Set preferred_column only if None (first vertical move after horizontal)
+                        if cursor.preferred_column.is_none() {
+                            cursor.preferred_column = Some(cursor.position.column);
+                        }
+                        println!(
+                            "[DEBUG][ArrowUp] preferred_column={:?}, before={:?}, moving to line={}, target_line_len={}",
+                            cursor.preferred_column,
+                            cursor.position,
+                            if new_pos.line > 0 {
+                                new_pos.line - 1
+                            } else {
+                                0
+                            },
+                            lines
+                                .get(if new_pos.line > 0 {
+                                    new_pos.line - 1
+                                } else {
+                                    0
+                                })
+                                .map(|l| l.len())
+                                .unwrap_or(0)
+                        );
+
                         if new_pos.line > 0 {
                             new_pos.line -= 1;
                         }
 
+                        // Always use preferred_column for vertical moves, clamped to line length
+                        let target_line_len = lines.get(new_pos.line).map(|l| l.len()).unwrap_or(0);
+                        new_pos.column = cursor.preferred_column.unwrap().min(target_line_len);
+
+                        println!(
+                            "[DEBUG][ArrowUp] after move: new_pos={:?}, preferred_column={:?}",
+                            new_pos, cursor.preferred_column
+                        );
                         response.commands.push(editor::Command::MoveCursor {
                             buffer_id: self.buffer_id,
                             position: new_pos,
@@ -772,16 +827,50 @@ fn main() {
                 }
 
                 Key::ArrowDown => {
-                    // Move cursor down
-                    if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
-                        let mut new_pos = cursor.position();
-                        if let Some(text) = self.edtr_state.get_buffer_text(self.buffer_id) {
-                            let line_count = text.lines().count();
-                            if new_pos.line + 1 < line_count {
-                                new_pos.line += 1;
-                            }
+                    // Move cursor down with preferred column logic
+                    let text = self
+                        .edtr_state
+                        .get_buffer_text(self.buffer_id)
+                        .unwrap_or_default();
+                    let lines: Vec<&str> = text.lines().collect();
+                    if let Some(cursor) = self.edtr_state.cursors.get_mut(&self.buffer_id) {
+                        let mut new_pos = cursor.position;
+
+                        // Set preferred_column only if None (first vertical move after horizontal)
+                        if cursor.preferred_column.is_none() {
+                            cursor.preferred_column = Some(cursor.position.column);
+                        }
+                        println!(
+                            "[DEBUG][ArrowDown] preferred_column={:?}, before={:?}, moving to line={}, target_line_len={}",
+                            cursor.preferred_column,
+                            cursor.position,
+                            if new_pos.line + 1 < lines.len() {
+                                new_pos.line + 1
+                            } else {
+                                new_pos.line
+                            },
+                            lines
+                                .get(if new_pos.line + 1 < lines.len() {
+                                    new_pos.line + 1
+                                } else {
+                                    new_pos.line
+                                })
+                                .map(|l| l.len())
+                                .unwrap_or(0)
+                        );
+
+                        if new_pos.line + 1 < lines.len() {
+                            new_pos.line += 1;
                         }
 
+                        // Always use preferred_column for vertical moves, clamped to line length
+                        let target_line_len = lines.get(new_pos.line).map(|l| l.len()).unwrap_or(0);
+                        new_pos.column = cursor.preferred_column.unwrap().min(target_line_len);
+
+                        println!(
+                            "[DEBUG][ArrowDown] after move: new_pos={:?}, preferred_column={:?}",
+                            new_pos, cursor.preferred_column
+                        );
                         response.commands.push(editor::Command::MoveCursor {
                             buffer_id: self.buffer_id,
                             position: new_pos,
@@ -828,6 +917,13 @@ fn main() {
                                     position: new_pos,
                                 });
                                 response.cursor_moved = true;
+
+                                // Reset preferred_column on deletion
+                                if let Some(cursor_mut) =
+                                    self.edtr_state.cursors.get_mut(&self.buffer_id)
+                                {
+                                    cursor_mut.preferred_column = None;
+                                }
                             }
                         }
                     }
@@ -847,6 +943,13 @@ fn main() {
                             });
 
                             response.text_changed = true;
+
+                            // Reset preferred_column on deletion
+                            if let Some(cursor_mut) =
+                                self.edtr_state.cursors.get_mut(&self.buffer_id)
+                            {
+                                cursor_mut.preferred_column = None;
+                            }
                         }
                     }
                 }

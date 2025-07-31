@@ -10,6 +10,8 @@ pub struct State {
     pub(crate) selection: Option<Range>,
     /// The identifier of the buffer the cursor is associated with.
     pub(crate) buffer_id: super::buffer::ID,
+    /// The preferred column for vertical navigation (persistent across frames).
+    pub preferred_column: Option<usize>,
 }
 
 impl State {
@@ -25,6 +27,7 @@ impl State {
             position,
             selection,
             buffer_id,
+            preferred_column: None,
         }
     }
 

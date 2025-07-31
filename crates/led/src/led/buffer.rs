@@ -88,6 +88,7 @@ pub mod editor {
                     position: super::super::types::Position { line: 0, column: 0 },
                     selection: None,
                     buffer_id,
+                    preferred_column: None,
                 },
             );
             self.undo_stack.insert(buffer_id, Vec::new());
