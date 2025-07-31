@@ -282,7 +282,8 @@ pub mod piece {
         /// The corresponding character offset.
         pub fn position_to_offset(&self, pos: super::Position) -> usize {
             let mut current_line = 0;
-            let mut current_offset = 0;
+            let mut current_column = 0;
+            let mut offset = 0;
 
             for piece in &self.pieces {
                 let src_txt = match piece.source {
@@ -290,29 +291,20 @@ pub mod piece {
                     ID::Add => &self.add_buffer,
                 };
                 let piece_txt = &src_txt[piece.start..piece.start + piece.length];
-                let mut line_start_offset = current_offset;
-                let mut chars = piece_txt.char_indices().peekable();
-
-                while let Some((i, ch)) = chars.next() {
-                    if current_line == pos.line {
-                        // We're on the correct line, so offset is at line_start_offset + column
-                        // But don't go past the end of the piece
-                        let line_end_offset = if let Some((next_i, _)) = chars.peek() {
-                            current_offset + *next_i
-                        } else {
-                            current_offset + piece.length
-                        };
-                        let line_len = line_end_offset - line_start_offset;
-                        return line_start_offset + pos.column.min(line_len);
+                for ch in piece_txt.chars() {
+                    if current_line == pos.line && current_column == pos.column {
+                        return offset;
                     }
                     if ch == '\n' {
                         current_line += 1;
-                        line_start_offset = current_offset + i + 1;
+                        current_column = 0;
+                    } else {
+                        current_column += 1;
                     }
+                    offset += ch.len_utf8();
                 }
-                current_offset += piece.length;
             }
-            // If the position is past the end, return the total length
+            // If position is past the end, return total length
             self.total_length
         }
 
