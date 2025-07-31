@@ -154,8 +154,7 @@ pub mod txt {
                     last_frame_time: std::time::Instant::now(),
                 };
 
-                let content = r#"
-// Welcome to LED!!!!
+                let content = r#"// Welcome to LED!!!!
 // The Editor 4U!!!!
 fn main() {
     println!("Hello, world!");
@@ -375,14 +374,13 @@ fn main() {
                     };
                     let font_id = egui::FontId::monospace(self.font_size);
                     let theme = self.gui_ctx.style_system.get_active_theme().clone();
-                    let mut y = TOP_PADDING + TEXT_TOP_PADDING;
+                    let mut y = TOP_PADDING + TEXT_TOP_PADDING + line_height;
                     for (line_num, line) in text.lines().enumerate() {
                         // Draw line number
                         let mut x = LEFT_PADDING;
                         if self.show_line_numbers {
                             let line_text = format!("{:>4}", line_num + 1);
-                            let baseline_adjust = line_height * 0.2;
-                            let pos = egui::pos2(x, y + baseline_adjust);
+                            let pos = egui::pos2(LEFT_PADDING, y);
                             ui.painter().text(
                                 pos,
                                 egui::Align2::LEFT_TOP,
@@ -452,8 +450,8 @@ fn main() {
                 let mut y = TOP_PADDING;
                 for (line_num, _) in text.lines().enumerate() {
                     let line_text = format!("{:>4}", line_num + 1);
-                    // Adjust baseline so numbers are vertically centered with text
-                    let baseline_adjust = line_height * 0.2;
+                    // No baseline adjustment; align exactly with buffer text
+                    let baseline_adjust = line_height * 0.8;
                     let pos = egui::pos2(LEFT_PADDING, y + baseline_adjust);
                     ui.painter().text(
                         pos,
