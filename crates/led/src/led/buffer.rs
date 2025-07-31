@@ -92,9 +92,11 @@ pub mod editor {
             );
             self.undo_stack.insert(buffer_id, Vec::new());
             self.redo_stack.insert(buffer_id, Vec::new());
-            if self.active_buffer.is_none() {
-                self.active_buffer = Some(buffer_id);
-            }
+            // if self.active_buffer.is_none() {
+            //     self.active_buffer = Some(buffer_id);
+            // }
+            self.active_buffer = Some(buffer_id);
+
             buffer_id
         }
 

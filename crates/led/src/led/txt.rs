@@ -106,11 +106,7 @@ fn main() {
 
                 let response = text_editor.show(ui, avail_rect);
 
-                if let Some(edtr_response) = response {
-                    for command in edtr_response.commands {
-                        let _ = self.edtr_state.execute_command(command);
-                    }
-                }
+                // Commands are now executed immediately in Widget::show, so do not execute them here.
             }
         }
 
@@ -312,6 +308,10 @@ fn main() {
                 );
             });
             self.handle_input(ui, &mut response);
+            // Immediately execute commands so state is up-to-date
+            for command in &response.commands {
+                let _ = self.edtr_state.execute_command(command.clone());
+            }
             Some(response)
         }
 
@@ -492,7 +492,8 @@ fn main() {
             if cursor_visible {
                 let cursor_x = cursor_state.position().column as f32 * char_width
                     + LEFT_PADDING
-                    + line_number_width;
+                    + line_number_width
+                    + TEXT_LEFT_PADDING;
                 let cursor_y = cursor_state.position().line as f32 * line_height + TOP_PADDING;
 
                 ui.painter().line_segment(
