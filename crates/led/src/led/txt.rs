@@ -722,6 +722,16 @@ fn main() {
                         });
 
                         response.text_changed = true;
+
+                        // Move cursor to start of next line
+                        let mut new_pos = cursor.position();
+                        new_pos.line += 1;
+                        new_pos.column = 0;
+                        response.commands.push(editor::Command::MoveCursor {
+                            buffer_id: self.buffer_id,
+                            position: new_pos,
+                        });
+                        response.cursor_moved = true;
                     }
                 }
 
