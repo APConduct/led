@@ -330,6 +330,62 @@ fn main() {
                     let theme = self.gui_ctx.style_system.get_active_theme().clone();
                     let origin = ui.min_rect().min;
 
+                    // Local flag for auto-scroll
+                    let mut should_scroll_to_cursor = false;
+
+                    // Handle keyboard and text input
+                    ui.input(|i| {
+                        for event in &i.events {
+                            match event {
+                                egui::Event::Text(text) => {
+                                    // Insert text at refreshed cursor position
+                                    if let Some(cursor) =
+                                        self.edtr_state.get_cursor_state(self.buffer_id)
+                                    {
+                                        let buffer =
+                                            self.edtr_state.buffers().get(&self.buffer_id).unwrap();
+                                        let offset = buffer.position_to_offset(cursor.position());
+
+                                        response.commands.push(editor::Command::InsertText {
+                                            buffer_id: self.buffer_id,
+                                            offset,
+                                            text: text.clone(),
+                                        });
+
+                                        response.text_changed = true;
+
+                                        // Advance cursor right by one column after insert
+                                        let mut new_pos = cursor.position();
+                                        new_pos.column += text.chars().count(); // Usually 1, but supports paste
+                                        response.commands.push(editor::Command::MoveCursor {
+                                            buffer_id: self.buffer_id,
+                                            position: new_pos,
+                                        });
+                                        response.cursor_moved = true;
+
+                                        // Reset preferred_column on text input
+                                        if let Some(cursor_mut) =
+                                            self.edtr_state.cursors.get_mut(&self.buffer_id)
+                                        {
+                                            cursor_mut.preferred_column = None;
+                                        }
+                                        // Set flag to auto-scroll after text input
+                                        should_scroll_to_cursor = true;
+                                    }
+                                }
+                                egui::Event::Key {
+                                    key,
+                                    pressed: true,
+                                    modifiers,
+                                    ..
+                                } => {
+                                    self.handle_key_event(*key, *modifiers, &mut response);
+                                }
+                                _ => {}
+                            }
+                        }
+                    });
+
                     // Paint background
                     ui.painter()
                         .rect_filled(rect, egui::Rounding::ZERO, theme.background);
@@ -396,36 +452,32 @@ fn main() {
                         &theme,
                         line_number_width,
                     );
+                    // Always refetch the updated cursor state after executing commands
+                    if let Some(cursor_state) = self.edtr_state.get_cursor_state(self.buffer_id) {
+                        crsr_state = cursor_state.clone();
+                    }
 
-                    // Corrected cursor position (relative to scroll area origin)
-                    let cursor_x = crsr_state.position().column as f32 * char_width
-                        + origin.x
-                        + LEFT_PADDING
-                        + line_number_width
-                        + TEXT_LEFT_PADDING;
-                    let cursor_y = crsr_state.position().line as f32 * line_height
-                        + origin.y
-                        + TOP_PADDING
-                        + TEXT_TOP_PADDING;
-                    let cursor_rect = egui::Rect::from_min_size(
-                        egui::pos2(cursor_x, cursor_y),
-                        egui::vec2(2.0, line_height),
-                    );
-
-                    // Only scroll to cursor if it moved (fixes snapping/acceleration bug)
-                    if response.cursor_moved {
+                    // Auto-scroll to cursor after any edit or movement
+                    should_scroll_to_cursor = response.cursor_moved || response.text_changed;
+                    if should_scroll_to_cursor {
+                        let cursor_x = crsr_state.position().column as f32 * char_width
+                            + origin.x
+                            + LEFT_PADDING
+                            + line_number_width
+                            + TEXT_LEFT_PADDING;
+                        let cursor_y = crsr_state.position().line as f32 * line_height
+                            + origin.y
+                            + TOP_PADDING
+                            + TEXT_TOP_PADDING;
+                        let cursor_rect = egui::Rect::from_min_size(
+                            egui::pos2(cursor_x, cursor_y),
+                            egui::vec2(2.0, line_height),
+                        );
                         ui.scroll_to_rect(cursor_rect, Some(egui::Align::Center));
                     }
 
                     // Handle input (mouse and keyboard) with scroll offset
-                    self.handle_input_with_scroll(
-                        ui,
-                        rect.min,
-                        line_height,
-                        char_width,
-                        &mut response,
-                        line_number_width,
-                    );
+                    // (removed call to handle_input_with_scroll; all input handling is now inside the scroll area closure)
                 });
 
             // Immediately execute commands so state is up-to-date
@@ -539,88 +591,7 @@ fn main() {
         }
 
         // Helper: handle input with scroll offset
-        fn handle_input_with_scroll(
-            &mut self,
-            ui: &mut egui::Ui,
-            scroll_origin: egui::Pos2,
-            line_height: f32,
-            char_width: f32,
-            response: &mut editor::Response,
-            line_number_width: f32,
-        ) {
-            // Keyboard input (unchanged)
-            ui.input(|i| {
-                for event in &i.events {
-                    match event {
-                        egui::Event::Text(text) => {
-                            // Insert text at refreshed cursor position
-                            if let Some(cursor) = self.edtr_state.get_cursor_state(self.buffer_id) {
-                                let buffer =
-                                    self.edtr_state.buffers().get(&self.buffer_id).unwrap();
-                                let offset = buffer.position_to_offset(cursor.position());
-
-                                response.commands.push(editor::Command::InsertText {
-                                    buffer_id: self.buffer_id,
-                                    offset,
-                                    text: text.clone(),
-                                });
-
-                                response.text_changed = true;
-
-                                // Advance cursor right by one column after insert
-                                let mut new_pos = cursor.position();
-                                new_pos.column += text.chars().count(); // Usually 1, but supports paste
-                                response.commands.push(editor::Command::MoveCursor {
-                                    buffer_id: self.buffer_id,
-                                    position: new_pos,
-                                });
-                                response.cursor_moved = true;
-
-                                // Reset preferred_column on text input
-                                if let Some(cursor_mut) =
-                                    self.edtr_state.cursors.get_mut(&self.buffer_id)
-                                {
-                                    cursor_mut.preferred_column = None;
-                                }
-                            }
-                        }
-                        egui::Event::Key {
-                            key,
-                            pressed: true,
-                            modifiers,
-                            ..
-                        } => {
-                            self.handle_key_event(*key, *modifiers, response);
-                        }
-                        _ => {}
-                    }
-                }
-            });
-
-            // Mouse input, adjusting for scroll offset
-            if ui.rect_contains_pointer(ui.available_rect_before_wrap()) {
-                if ui.input(|i| i.pointer.primary_clicked()) {
-                    if let Some(pos) = ui.input(|i| i.pointer.interact_pos()) {
-                        // Convert mouse position to text position, subtracting scroll origin
-                        let local_pos = pos - scroll_origin;
-                        let line = ((local_pos.y - TOP_PADDING - TEXT_TOP_PADDING - line_height)
-                            / line_height)
-                            .max(0.0) as usize;
-                        let column =
-                            ((local_pos.x - LEFT_PADDING - line_number_width - TEXT_LEFT_PADDING)
-                                / char_width)
-                                .max(0.0) as usize;
-
-                        response.commands.push(editor::Command::MoveCursor {
-                            buffer_id: self.buffer_id,
-                            position: Position { line, column },
-                        });
-
-                        response.cursor_moved = true;
-                    }
-                }
-            }
-        }
+        // (now unused, all input handling is inside the scroll area closure)
 
         fn render_cursor(
             &mut self,
@@ -924,6 +895,7 @@ fn main() {
                                 {
                                     cursor_mut.preferred_column = None;
                                 }
+                                // Set flag to auto-scroll after deletion
                             }
                         }
                     }
@@ -950,6 +922,7 @@ fn main() {
                             {
                                 cursor_mut.preferred_column = None;
                             }
+                            // Set flag to auto-scroll after deletion
                         }
                     }
                 }
