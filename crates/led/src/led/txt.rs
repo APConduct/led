@@ -458,33 +458,39 @@ fn main() {
                     }
 
                     // Auto-scroll to cursor after any edit or movement, but only if cursor leaves visible area
-                    should_scroll_to_cursor = response.cursor_moved || response.text_changed;
-                    if should_scroll_to_cursor {
-                        let cursor_x = crsr_state.position().column as f32 * char_width
-                            + origin.x
-                            + LEFT_PADDING
-                            + line_number_width
-                            + TEXT_LEFT_PADDING;
-                        let cursor_y = crsr_state.position().line as f32 * line_height
-                            + origin.y
-                            + TOP_PADDING
-                            + TEXT_TOP_PADDING;
-                        let cursor_rect = egui::Rect::from_min_size(
-                            egui::pos2(cursor_x, cursor_y),
-                            egui::vec2(2.0, line_height),
-                        );
-                        let margin = line_height * 2.0;
-                        let clip_rect = ui.clip_rect();
+                    // Unified auto-scroll logic: always scroll after edits or moves, using margin and align
+                    let cursor_x = crsr_state.position().column as f32 * char_width
+                        + origin.x
+                        + LEFT_PADDING
+                        + line_number_width
+                        + TEXT_LEFT_PADDING;
+                    let cursor_y = crsr_state.position().line as f32 * line_height
+                        + origin.y
+                        + TOP_PADDING
+                        + TEXT_TOP_PADDING;
+                    let cursor_rect = egui::Rect::from_min_size(
+                        egui::pos2(cursor_x, cursor_y),
+                        egui::vec2(2.0, line_height),
+                    );
+                    let margin = line_height * 2.0;
+                    let clip_rect = ui.clip_rect();
 
-                        let margin = line_height * 2.0;
-                        let clip_rect = ui.clip_rect();
+                    let cursor_bottom = cursor_rect.bottom();
+                    let cursor_top = cursor_rect.top();
 
-                        let bottom_trigger = cursor_rect.bottom() > clip_rect.bottom() - margin;
-                        let top_trigger = cursor_rect.top() < clip_rect.top() + margin;
+                    let bottom_trigger = cursor_bottom > clip_rect.bottom() - margin;
+                    let top_trigger = cursor_top < clip_rect.top() + margin;
 
-                        if bottom_trigger || top_trigger {
-                            ui.scroll_to_rect(cursor_rect, None);
-                        }
+                    if bottom_trigger || top_trigger {
+                        // Scroll so the cursor is margin above the bottom or below the top
+                        let align = if bottom_trigger {
+                            Some(egui::Align::Max)
+                        } else if top_trigger {
+                            Some(egui::Align::Min)
+                        } else {
+                            None
+                        };
+                        ui.scroll_to_rect(cursor_rect, align);
                     }
 
                     // Handle input (mouse and keyboard) with scroll offset
