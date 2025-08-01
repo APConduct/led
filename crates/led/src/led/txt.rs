@@ -478,9 +478,11 @@ fn main() {
                         );
                         // Add a 2-line scroll margin so the cursor can move closer to the top/bottom before triggering scroll
                         let margin_lines = 2.0;
-                        let margin = line_height * margin_lines;
+                        let margin_y = line_height * margin_lines;
+                        let margin_x = char_width * 2.0; // 2 characters horizontal margin
                         let clip_rect = ui.clip_rect();
-                        let expanded_cursor_rect = cursor_rect.expand2(egui::vec2(0.0, margin));
+                        let expanded_cursor_rect =
+                            cursor_rect.expand2(egui::vec2(margin_x, margin_y));
 
                         if !clip_rect.contains_rect(expanded_cursor_rect) {
                             ui.scroll_to_rect(expanded_cursor_rect, None);
