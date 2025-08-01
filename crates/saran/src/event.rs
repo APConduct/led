@@ -1,10 +1,9 @@
-
-use crate::point::Point;
 use crate::key::Code as KeyCode;
-use crate::widget;
-use std::collections::HashSet;
-use crate::theme::Theme;
 use crate::key::Modifiers;
+use crate::point::Point;
+use crate::theme::Theme;
+
+use std::collections::HashSet;
 
 /// A type alias for a 2D point with `f32` coordinates, representing a position on the screen.
 type ScreenPoint = Point<f32>;
@@ -70,11 +69,11 @@ pub enum Event {
 /// Context for handling events, containing state about the UI and input devices.
 pub struct Context<'a> {
     /// The currently focused widget, if any.
-    pub focused_widget: Option<widget::ID>,
+    pub focused_widget: Option<crate::widget::WidgetId>,
     /// The widget currently under the mouse cursor, if any.
-    pub hovered_widget: Option<widget::ID>,
+    pub hovered_widget: Option<crate::widget::WidgetId>,
     /// The widget currently being interacted with (e.g., pressed), if any.
-    pub active_widget: Option<widget::ID>,
+    pub active_widget: Option<crate::widget::WidgetId>,
     /// The current position of the mouse cursor.
     pub mouse_pos: ScreenPoint,
     /// The set of mouse buttons currently pressed.
@@ -114,12 +113,12 @@ pub enum MouseButton {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::point::Point;
     use crate::key::Code as KeyCode;
     use crate::key::Modifiers;
+    use crate::point::Point;
 
     fn dummy_point() -> Point<f32> {
-        Point::new( 1.0, 2.0 )
+        Point::new(1.0, 2.0)
     }
 
     #[test]
@@ -184,7 +183,12 @@ mod tests {
             modifiers: Modifiers::default(),
             repeat: true,
         };
-        if let Event::KeyDown { key, modifiers, repeat } = event {
+        if let Event::KeyDown {
+            key,
+            modifiers,
+            repeat,
+        } = event
+        {
             assert_eq!(key, KeyCode::A);
             assert_eq!(modifiers, Modifiers::default());
             assert!(repeat);
