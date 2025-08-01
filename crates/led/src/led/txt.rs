@@ -457,7 +457,7 @@ fn main() {
                         crsr_state = cursor_state.clone();
                     }
 
-                    // Auto-scroll to cursor after any edit or movement
+                    // Auto-scroll to cursor after any edit or movement, but only if cursor leaves visible area
                     should_scroll_to_cursor = response.cursor_moved || response.text_changed;
                     if should_scroll_to_cursor {
                         let cursor_x = crsr_state.position().column as f32 * char_width
@@ -473,7 +473,18 @@ fn main() {
                             egui::pos2(cursor_x, cursor_y),
                             egui::vec2(2.0, line_height),
                         );
-                        ui.scroll_to_rect(cursor_rect, Some(egui::Align::Center));
+                        let margin = line_height * 2.0;
+                        let clip_rect = ui.clip_rect();
+
+                        let margin = line_height * 2.0;
+                        let clip_rect = ui.clip_rect();
+
+                        let bottom_trigger = cursor_rect.bottom() > clip_rect.bottom() - margin;
+                        let top_trigger = cursor_rect.top() < clip_rect.top() + margin;
+
+                        if bottom_trigger || top_trigger {
+                            ui.scroll_to_rect(cursor_rect, None);
+                        }
                     }
 
                     // Handle input (mouse and keyboard) with scroll offset
