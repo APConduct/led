@@ -258,7 +258,7 @@ fn main() {
             edtr_state: &'a mut led::buffer::editor::State,
             gui_ctx: &'a mut saran::context::Context,
         ) -> Self {
-            println!("[DEBUG] Widget::new called");
+            // println!("[DEBUG] Widget::new called");
             Self {
                 buffer_id,
                 edtr_state,
@@ -774,24 +774,24 @@ fn main() {
                         if cursor.preferred_column.is_none() {
                             cursor.preferred_column = Some(cursor.position.column);
                         }
-                        println!(
-                            "[DEBUG][ArrowUp] preferred_column={:?}, before={:?}, moving to line={}, target_line_len={}",
-                            cursor.preferred_column,
-                            cursor.position,
-                            if new_pos.line > 0 {
-                                new_pos.line - 1
-                            } else {
-                                0
-                            },
-                            lines
-                                .get(if new_pos.line > 0 {
-                                    new_pos.line - 1
-                                } else {
-                                    0
-                                })
-                                .map(|l| l.len())
-                                .unwrap_or(0)
-                        );
+                        // println!(
+                        //     "[DEBUG][ArrowUp] preferred_column={:?}, before={:?}, moving to line={}, target_line_len={}",
+                        //     cursor.preferred_column,
+                        //     cursor.position,
+                        //     if new_pos.line > 0 {
+                        //         new_pos.line - 1
+                        //     } else {
+                        //         0
+                        //     },
+                        //     lines
+                        //         .get(if new_pos.line > 0 {
+                        //             new_pos.line - 1
+                        //         } else {
+                        //             0
+                        //         })
+                        //         .map(|l| l.len())
+                        //         .unwrap_or(0)
+                        // );
 
                         if new_pos.line > 0 {
                             new_pos.line -= 1;
@@ -801,10 +801,10 @@ fn main() {
                         let target_line_len = lines.get(new_pos.line).map(|l| l.len()).unwrap_or(0);
                         new_pos.column = cursor.preferred_column.unwrap().min(target_line_len);
 
-                        println!(
-                            "[DEBUG][ArrowUp] after move: new_pos={:?}, preferred_column={:?}",
-                            new_pos, cursor.preferred_column
-                        );
+                        // println!(
+                        //     "[DEBUG][ArrowUp] after move: new_pos={:?}, preferred_column={:?}",
+                        //     new_pos, cursor.preferred_column
+                        // );
                         response.commands.push(editor::Command::MoveCursor {
                             buffer_id: self.buffer_id,
                             position: new_pos,
@@ -828,24 +828,24 @@ fn main() {
                         if cursor.preferred_column.is_none() {
                             cursor.preferred_column = Some(cursor.position.column);
                         }
-                        println!(
-                            "[DEBUG][ArrowDown] preferred_column={:?}, before={:?}, moving to line={}, target_line_len={}",
-                            cursor.preferred_column,
-                            cursor.position,
-                            if new_pos.line + 1 < lines.len() {
-                                new_pos.line + 1
-                            } else {
-                                new_pos.line
-                            },
-                            lines
-                                .get(if new_pos.line + 1 < lines.len() {
-                                    new_pos.line + 1
-                                } else {
-                                    new_pos.line
-                                })
-                                .map(|l| l.len())
-                                .unwrap_or(0)
-                        );
+                        // println!(
+                        //     "[DEBUG][ArrowDown] preferred_column={:?}, before={:?}, moving to line={}, target_line_len={}",
+                        //     cursor.preferred_column,
+                        //     cursor.position,
+                        //     if new_pos.line + 1 < lines.len() {
+                        //         new_pos.line + 1
+                        //     } else {
+                        //         new_pos.line
+                        //     },
+                        //     lines
+                        //         .get(if new_pos.line + 1 < lines.len() {
+                        //             new_pos.line + 1
+                        //         } else {
+                        //             new_pos.line
+                        //         })
+                        //         .map(|l| l.len())
+                        //         .unwrap_or(0)
+                        // );
 
                         if new_pos.line + 1 < lines.len() {
                             new_pos.line += 1;
@@ -855,10 +855,10 @@ fn main() {
                         let target_line_len = lines.get(new_pos.line).map(|l| l.len()).unwrap_or(0);
                         new_pos.column = cursor.preferred_column.unwrap().min(target_line_len);
 
-                        println!(
-                            "[DEBUG][ArrowDown] after move: new_pos={:?}, preferred_column={:?}",
-                            new_pos, cursor.preferred_column
-                        );
+                        // println!(
+                        //     "[DEBUG][ArrowDown] after move: new_pos={:?}, preferred_column={:?}",
+                        //     new_pos, cursor.preferred_column
+                        // );
                         response.commands.push(editor::Command::MoveCursor {
                             buffer_id: self.buffer_id,
                             position: new_pos,
