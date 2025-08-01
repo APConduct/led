@@ -476,21 +476,14 @@ fn main() {
                             egui::pos2(cursor_x, cursor_y),
                             egui::vec2(2.0, line_height),
                         );
-                        let margin = line_height * 2.0;
+                        // Add a 2-line scroll margin so the cursor can move closer to the top/bottom before triggering scroll
+                        let margin_lines = 2.0;
+                        let margin = line_height * margin_lines;
                         let clip_rect = ui.clip_rect();
+                        let expanded_cursor_rect = cursor_rect.expand(margin);
 
-                        let cursor_bottom = cursor_rect.bottom();
-                        let cursor_top = cursor_rect.top();
-
-                        let bottom_trigger = cursor_bottom > clip_rect.bottom() - margin;
-                        let top_trigger = cursor_top < clip_rect.top() + margin;
-
-                        if bottom_trigger {
-                            let align = Some(egui::Align::Max);
-                            ui.scroll_to_rect(cursor_rect, align);
-                        } else if top_trigger {
-                            let align = Some(egui::Align::Min);
-                            ui.scroll_to_rect(cursor_rect, align);
+                        if !clip_rect.contains_rect(expanded_cursor_rect) {
+                            ui.scroll_to_rect(expanded_cursor_rect, None);
                         }
                         // Reset flag after scrolling
                         should_scroll_to_cursor = false;
