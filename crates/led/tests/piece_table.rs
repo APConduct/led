@@ -57,7 +57,7 @@ fn test_offset_to_position_and_back() {
     assert_eq!(offset, 12);
 
     let offset = table.position_to_offset(Position { line: 3, column: 2 });
-    assert_eq!(offset, 19); // 'Hello\nworld\npiece\nta'
+    assert_eq!(offset, 20); // 'Hello\nworld\npiece\nta'
 }
 
 #[test]
