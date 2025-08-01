@@ -480,13 +480,11 @@ fn main() {
                         let margin_lines = 2.0;
                         let margin = line_height * margin_lines;
                         let clip_rect = ui.clip_rect();
-                        let expanded_cursor_rect = cursor_rect.expand(margin);
+                        let expanded_cursor_rect = cursor_rect.expand2(egui::vec2(0.0, margin));
 
                         if !clip_rect.contains_rect(expanded_cursor_rect) {
                             ui.scroll_to_rect(expanded_cursor_rect, None);
                         }
-                        // Reset flag after scrolling
-                        should_scroll_to_cursor = false;
                     }
 
                     // Handle input (mouse and keyboard) with scroll offset
@@ -654,7 +652,6 @@ fn main() {
             // Simple selection rendering - can be optimized
             let start_y = selection.start.line as f32 * line_height + TOP_PADDING;
             let end_y = selection.end.line as f32 * line_height + TOP_PADDING;
-
             if selection.start.line == selection.end.line {
                 // Single line selection
                 let start_x =
